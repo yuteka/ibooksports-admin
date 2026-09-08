@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-orange: #F94001;
+  --brand-orange-dark: #D93600;
+  --brand-orange-light: #FFF1EC;
+  --brand-navy: #021526;
+  --brand-navy-dark: #010d18;
+  --brand-surface: #F3F4F4;
+  --brand-secondary: #5F6368;
+  --brand-bg: #F8F9FA;
+  --background: #F8F9FA;
+  --foreground: #021526;
+}
+
+/* ============================================================ */
+/* GLOBAL SCROLLBAR REMOVAL - HIDE ALL SCROLLBARS GLOBALLY      */
+/* ============================================================ */
+* {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE 10+ and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Opera, Edge */
+  width: 0px !important;
+  height: 0px !important;
+  background: transparent !important;
+}
+
+html,
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-manrope), Manrope, sans-serif;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none !important;
+  width: 0px !important;
+  height: 0px !important;
+}
+
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: var(--font-urbanist), Urbanist, sans-serif;
+}
+
+/* Explicit Utility Classes */
+.no-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0px !important;
+  height: 0px !important;
+}
