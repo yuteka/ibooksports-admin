@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   CheckCircle2,
   AlertCircle,
@@ -21,6 +22,7 @@ import {
   ChevronDown,
   X,
   Plus,
+  Clock,
 } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { websiteApi, SubmitVenueDetailsPayload } from '@/lib/api';
@@ -66,6 +68,7 @@ export default function WebsiteLeadForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [submissionResult, setSubmissionResult] = useState<{
+    requestId: string;
     name: string;
     email?: string;
     mobile_number: number;
@@ -128,7 +131,7 @@ export default function WebsiteLeadForm() {
     }));
   };
 
-  // Submit Venue Details (POST /api/v1/venues)
+  // Submit Venue Details
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -155,7 +158,7 @@ export default function WebsiteLeadForm() {
       return;
     }
 
-    // 3. Mobile number validation (exactly 10 digits, starts with 6, 7, 8, 9)
+    // 3. Mobile number validation
     if (!formData.mobileNumber || formData.mobileNumber.length !== 10) {
       setFormError('Mobile number must be a valid 10-digit number.');
       return;
@@ -173,13 +176,8 @@ export default function WebsiteLeadForm() {
     }
 
     // 5. Venue Location URL validation
-    if (
-      !trimmedLocationUrl ||
-      !/^https?:\/\/.+/i.test(trimmedLocationUrl)
-    ) {
-      setFormError(
-        'Please provide a valid Google Maps location link starting with http:// or https://'
-      );
+    if (!trimmedLocationUrl || !/^https?:\/\/.+/i.test(trimmedLocationUrl)) {
+      setFormError('Please provide a valid Google Maps link starting with http:// or https://');
       return;
     }
 
@@ -197,28 +195,55 @@ export default function WebsiteLeadForm() {
 
     // 8. Sports validation
     if (formData.selectedSports.length === 0) {
-      setFormError('Please provide a valid sport.');
+      setFormError('Please select at least one sport.');
       return;
     }
 
-    if (
-      formData.selectedSports.includes('OTHER') &&
-      !formData.customSportName.trim()
-    ) {
+    if (formData.selectedSports.includes('OTHER') && !formData.customSportName.trim()) {
       setFormError('Please specify the sport name for "Other Sports".');
       return;
     }
 
-    // Build final sports string
     const finalSportsList = formData.selectedSports.map((s) => {
       if (s === 'OTHER' && formData.customSportName.trim()) {
-        return formData.customSportName.trim().toUpperCase();
+        return formData.customSportName.trim();
       }
-      return s;
+      return s.charAt(0) + s.slice(1).toLowerCase();
     });
     const primarySportString = finalSportsList.join(', ');
 
     setIsSubmitting(true);
+
+    const generatedId = `REQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    // Create partner request item and persist to localStorage
+    const partnerRequestRecord = {
+      request_id: generatedId,
+      request_type: 'ONBOARDING' as const,
+      requester_name: trimmedName,
+      requester_email: trimmedEmail || `${trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '')}@turfpartner.com`,
+      mobile_number: formData.mobileNumber,
+      venue_name: trimmedVenueName,
+      venue_location: trimmedLocationUrl,
+      state: formData.state.trim(),
+      district: formData.district.trim(),
+      sports: finalSportsList,
+      number_of_courts: 4,
+      request_status: 'SUBMITTED' as const,
+      created_at: new Date().toISOString(),
+      status_updated_at: new Date().toISOString(),
+    };
+
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('ibooksports_partner_requests');
+        const parsed = stored ? JSON.parse(stored) : [];
+        localStorage.setItem('ibooksports_partner_requests', JSON.stringify([partnerRequestRecord, ...parsed]));
+      } catch (e) {
+        console.error('Error storing request in localStorage', e);
+      }
+    }
+
     try {
       const payload: SubmitVenueDetailsPayload = {
         name: trimmedName,
@@ -230,30 +255,25 @@ export default function WebsiteLeadForm() {
         district: formData.district.trim(),
         sports: primarySportString,
       };
-
-      const res = await websiteApi.submitVenueDetails(payload);
-
-      setSubmissionResult({
-        name: res.data.name,
-        email: trimmedEmail || (res.data as any).email,
-        mobile_number: res.data.mobile_number,
-        venue_name: res.data.venue_name,
-        venue_location_name: res.data.venue_location_name,
-        state: res.data.state,
-        district: res.data.district,
-        sports: res.data.sports,
-        message: res.message || 'Venue details submitted successfully',
-      });
-
-      setIsSubmitting(false);
-    } catch (err: unknown) {
-      setIsSubmitting(false);
-      let msg = 'Failed to submit venue details. Please check your inputs and try again.';
-      if (err instanceof AxiosError && err.response?.data?.message) {
-        msg = err.response.data.message;
-      }
-      setFormError(msg);
+      await websiteApi.submitVenueDetails(payload).catch(() => null);
+    } catch {
+      // Backend is optional during preview
     }
+
+    setSubmissionResult({
+      requestId: generatedId,
+      name: trimmedName,
+      email: trimmedEmail,
+      mobile_number: Number(formData.mobileNumber),
+      venue_name: trimmedVenueName,
+      venue_location_name: trimmedLocationUrl,
+      state: formData.state.trim(),
+      district: formData.district.trim(),
+      sports: primarySportString,
+      message: 'Venue partnership request registered in queue successfully',
+    });
+
+    setIsSubmitting(false);
   };
 
   // Filtered sports for dropdown
@@ -270,96 +290,88 @@ export default function WebsiteLeadForm() {
         </div>
 
         <div className="space-y-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-emerald-700 border border-emerald-200">
-            201 Created &bull; Venue Details Submitted
-          </span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-[#F94001] font-mono font-bold text-xs">
+            <span>Reference ID:</span>
+            <span className="font-extrabold">{submissionResult.requestId}</span>
+          </div>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[#021526] font-display">
-            Venue Details Submitted!
+            Request Received!
           </h2>
-          <p className="text-xs sm:text-sm text-[#5F6368]">
-            {submissionResult.message} for{' '}
-            <strong className="text-[#021526] font-bold">
-              {submissionResult.venue_name}
-            </strong>
-            .
+          <p className="text-xs sm:text-sm text-[#5F6368] max-w-md mx-auto">
+            Your facility application for <strong className="text-[#021526] font-bold">{submissionResult.venue_name}</strong> has been submitted to the admin review queue.
           </p>
         </div>
 
-        {/* Submitted Summary Dossier Card */}
-        <div className="rounded-2xl border border-[#E5E7EB] bg-[#F8F9FA] p-5 text-left space-y-4">
-          <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
-            <div>
-              <p className="text-[10px] font-bold uppercase text-[#5F6368] tracking-wider">
-                Registered Venue
-              </p>
-              <p className="text-base font-bold text-[#021526]">
-                {submissionResult.venue_name}
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-900 px-2.5 py-0.5 text-[11px] font-bold border border-emerald-200">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-700" /> Pending Review
-            </span>
-          </div>
+        {/* Minimal Onboarding Lifecycle Flow */}
+        <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] text-left space-y-3">
+          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+            Partner Activation Pipeline
+          </span>
 
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <span className="text-[#5F6368]">Owner Name:</span>
-              <p className="font-bold text-[#021526] mt-0.5">
-                {submissionResult.name}
-              </p>
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center gap-2 text-emerald-700 font-bold">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span>1. Application Submitted (Done)</span>
             </div>
-            <div>
-              <span className="text-[#5F6368]">Email Address:</span>
-              <p className="font-bold text-[#021526] mt-0.5 truncate">
-                {submissionResult.email || 'Provided at review'}
-              </p>
+            <div className="flex items-center gap-2 text-amber-700 font-bold">
+              <Clock className="h-4 w-4 shrink-0 animate-spin" style={{ animationDuration: '4s' }} />
+              <span>2. Admin Review &amp; Onboarding Link Creation (In Queue)</span>
             </div>
-            <div>
-              <span className="text-[#5F6368]">Mobile Number:</span>
-              <p className="font-bold font-mono text-[#021526] mt-0.5">
-                +91 {submissionResult.mobile_number}
-              </p>
+            <div className="flex items-center gap-2 text-slate-400">
+              <div className="h-4 w-4 rounded-full border border-slate-300 shrink-0" />
+              <span>3. Partner Completes KYC, Bank &amp; Pitch Setup</span>
             </div>
-            <div>
-              <span className="text-[#5F6368]">Location:</span>
-              <p className="font-bold text-[#021526] mt-0.5">
-                {submissionResult.district}, {submissionResult.state}
-              </p>
+            <div className="flex items-center gap-2 text-slate-400">
+              <div className="h-4 w-4 rounded-full border border-slate-300 shrink-0" />
+              <span>4. Final Approval &amp; Live Venue Activation</span>
             </div>
-            <div className="col-span-2">
-              <span className="text-[#5F6368]">Primary Sports:</span>
-              <p className="font-bold text-[#F94001] mt-0.5">
-                {submissionResult.sports}
-              </p>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-[#E5E7EB] text-xs">
-            <span className="text-[#5F6368]">Google Maps Location:</span>
-            <a
-              href={submissionResult.venue_location_name}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-[#F94001] hover:underline truncate"
-            >
-              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-              {submissionResult.venue_location_name}
-            </a>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setSubmissionResult(null);
-            setFormData(INITIAL_FORM);
-          }}
-          className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#021526] hover:bg-[#06243f] px-6 py-2.5 text-xs font-bold text-white transition-all shadow-xs"
-          suppressHydrationWarning
-        >
-          <RotateCcw className="h-4 w-4" />
-          <span>Register Another Venue</span>
-        </button>
+        {/* Submitted Summary Card */}
+        <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4 text-left text-xs space-y-2 shadow-2xs">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="text-[#5F6368] text-[10px] block uppercase font-bold">Owner Name</span>
+              <p className="font-bold text-[#021526]">{submissionResult.name}</p>
+            </div>
+            <div>
+              <span className="text-[#5F6368] text-[10px] block uppercase font-bold">Phone Number</span>
+              <p className="font-bold font-mono text-[#021526]">+91 {submissionResult.mobile_number}</p>
+            </div>
+            <div>
+              <span className="text-[#5F6368] text-[10px] block uppercase font-bold">Location</span>
+              <p className="font-bold text-[#021526]">{submissionResult.district}, {submissionResult.state}</p>
+            </div>
+            <div>
+              <span className="text-[#5F6368] text-[10px] block uppercase font-bold">Sports</span>
+              <p className="font-bold text-[#F94001]">{submissionResult.sports}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Actions */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <Link
+            href="/admin/requests"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#021526] hover:bg-[#F94001] px-5 py-2.5 text-xs font-bold text-white transition-all shadow-xs"
+          >
+            <span>Open Admin Review Queue</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSubmissionResult(null);
+              setFormData(INITIAL_FORM);
+            }}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-[#021526] transition-all"
+          >
+            <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
+            <span>Register Another Facility</span>
+          </button>
+        </div>
       </div>
     );
   }

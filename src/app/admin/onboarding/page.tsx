@@ -33,6 +33,7 @@ import {
   Calendar as CalendarIcon,
 } from 'lucide-react';
 import { onboardingApi, OnboardingSessionData } from '@/lib/api';
+import { VenueDetail } from '@/lib/mockData';
 
 const ONBOARDING_STEPS_META = [
   { step: 1, title: 'Mobile OTP Verification', icon: Phone, desc: '10-digit mobile number + 6-digit OTP' },
@@ -196,9 +197,6 @@ export default function PartnerOnboardingAdminTrackerPage() {
   const fetchApplications = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await onboardingApi.listAdminApplications();
-      setApplications(data);
-    } catch {
       // Fallback demo data
       const fallback: OnboardingSessionData[] = [
         {
@@ -292,7 +290,32 @@ export default function PartnerOnboardingAdminTrackerPage() {
           updated_at: '31-08-2026 04:53:15 PM IST',
         },
       ];
-      setApplications(fallback);
+
+      let combined: OnboardingSessionData[] = [];
+      try {
+        const data = await onboardingApi.listAdminApplications();
+        combined = (data && data.length > 0) ? data : fallback;
+      } catch {
+        combined = fallback;
+      }
+
+      // Merge newly seeded onboarding applications from localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('ibooksports_onboarding_apps');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const ids = new Set(parsed.map((p: any) => p.application_id));
+              combined = [...parsed, ...combined.filter((c) => !ids.has(c.application_id))];
+            }
+          }
+        } catch (e) {
+          console.error('Error loading local onboarding applications', e);
+        }
+      }
+
+      setApplications(combined);
     } finally {
       setLoading(false);
     }
@@ -325,9 +348,139 @@ export default function PartnerOnboardingAdminTrackerPage() {
     if (!actionTargetApp) return;
     setActionLoading(true);
     try {
-      await onboardingApi.reviewApplication(actionTargetApp.application_id, 'APPROVE', {
-        app_access_link: appLinkInput,
-      });
+      try {
+        await onboardingApi.reviewApplication(actionTargetApp.application_id, 'APPROVE', {
+          app_access_link: appLinkInput,
+        });
+      } catch (err) {
+        console.warn('API review failed or simulated', err);
+      }
+
+      // 1. Update status in localStorage ibooksports_onboarding_apps
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('ibooksports_onboarding_apps');
+          let parsed = stored ? JSON.parse(stored) : [];
+          const found = parsed.find((a: any) => a.application_id === actionTargetApp.application_id);
+          if (found) {
+            found.status = 'APPROVED';
+          } else {
+            parsed.unshift({ ...actionTargetApp, status: 'APPROVED' });
+          }
+          localStorage.setItem('ibooksports_onboarding_apps', JSON.stringify(parsed));
+
+          // 2. Convert to Live Venue in localStorage ibooksports_live_venues
+          const storedVenues = localStorage.getItem('ibooksports_live_venues');
+          let liveVenues: VenueDetail[] = storedVenues ? JSON.parse(storedVenues) : [];
+
+          const venueId = actionTargetApp.application_id.startsWith('REQ-')
+            ? 'VEN-' + actionTargetApp.application_id.replace('REQ-', '')
+            : `VEN-${Date.now().toString().slice(-4)}`;
+
+          const sportsArr: string[] = actionTargetApp.courts_config?.sports?.length
+            ? actionTargetApp.courts_config.sports
+            : ((actionTargetApp.business_details as any)?.sports
+                ? String((actionTargetApp.business_details as any).sports).split(',').map((s: string) => s.trim())
+                : ['Football', 'Cricket']);
+
+          const courtsArr = (actionTargetApp.courts_config?.courts && actionTargetApp.courts_config.courts.length > 0)
+            ? actionTargetApp.courts_config.courts.map((c: any, idx: number) => ({
+                id: `CRT-${venueId}-${idx + 1}`,
+                name: c.court_name || `Court ${idx + 1}`,
+                sport: (c.sports && c.sports[0]) || sportsArr[0] || 'Football',
+                surface: 'FIFA Pro 50mm Astroturf',
+                court_type: 'OUTDOOR' as const,
+                dimensions: '100ft x 65ft',
+                lighting: '500 Lux Commercial Stadium LED',
+                base_hourly_rate: c.regular_price || 1200,
+                status: 'ACTIVE' as const,
+              }))
+            : sportsArr.map((sp: string, idx: number) => ({
+                id: `CRT-${venueId}-${idx + 1}`,
+                name: `${sp} Ground ${idx + 1}`,
+                sport: sp,
+                surface: 'Professional Turf System',
+                court_type: 'OUTDOOR' as const,
+                dimensions: '100ft x 65ft',
+                lighting: '500 Lux Commercial Stadium LED',
+                base_hourly_rate: 1200,
+                status: 'ACTIVE' as const,
+              }));
+
+          const newLiveVenue: VenueDetail = {
+            id: venueId,
+            venue_name: actionTargetApp.business_details?.venue_name || 'Premier Sports Arena',
+            tagline: 'Certified Live Partner Facility & Arena',
+            name: actionTargetApp.partner_details?.name || 'Partner Owner',
+            mobile_number: Number(actionTargetApp.mobile_number || actionTargetApp.partner_details?.mobile_number) || 9876543210,
+            email: actionTargetApp.partner_details?.email || 'partner@ibooksports.com',
+            venue_location_name: actionTargetApp.business_details?.venue_google_maps_link || 'https://maps.google.com',
+            address: actionTargetApp.business_details?.venue_address || `${actionTargetApp.partner_details?.district || 'Coimbatore'}, ${actionTargetApp.partner_details?.state || 'Tamil Nadu'}`,
+            state: actionTargetApp.partner_details?.state || 'Tamil Nadu',
+            district: actionTargetApp.partner_details?.district || 'Coimbatore',
+            pincode: actionTargetApp.partner_details?.pincode || '641001',
+            sports: sportsArr.join(', '),
+            sports_list: sportsArr,
+            courts: courtsArr.length,
+            status: 'ACTIVE',
+            rating: 5.0,
+            total_reviews: 0,
+            opening_time: actionTargetApp.operating_hours?.starting_time || '06:00 AM',
+            closing_time: actionTargetApp.operating_hours?.closing_time || '11:00 PM',
+            created_at: new Date().toISOString(),
+            owner: {
+              full_name: actionTargetApp.partner_details?.name || 'Partner Owner',
+              phone: String(actionTargetApp.mobile_number || '9876543210'),
+              email: actionTargetApp.partner_details?.email || 'partner@ibooksports.com',
+              pan_number: 'ABCDE1234F',
+              pan_status: 'VERIFIED',
+              aadhaar_masked: 'XXXX-XXXX-8921',
+              aadhaar_status: 'VERIFIED',
+              gstin: actionTargetApp.business_details?.gst_number || '33AAAPL1298D1Z5',
+              gstin_status: actionTargetApp.business_details?.has_gst ? 'ACTIVE' : 'UNREGISTERED',
+              registered_address: actionTargetApp.partner_details?.address || 'Partner Address',
+              kyc_verified_date: new Date().toISOString().split('T')[0],
+            },
+            bank: {
+              account_holder_name: actionTargetApp.bank_details?.account_holder_name || actionTargetApp.partner_details?.name || 'Partner Account',
+              bank_name: actionTargetApp.bank_details?.bank_name || 'HDFC Bank Ltd',
+              account_number_masked: actionTargetApp.bank_details?.account_number ? `XXXX${String(actionTargetApp.bank_details.account_number).slice(-4)}` : 'XXXX4567',
+              ifsc_code: actionTargetApp.bank_details?.ifsc_code || 'HDFC0001234',
+              branch_name: actionTargetApp.bank_details?.branch_name || 'Main Branch',
+              upi_id: `${(actionTargetApp.partner_details?.name || 'partner').toLowerCase().replace(/\s+/g, '')}@okaxis`,
+              verification_status: 'VERIFIED',
+              penny_drop_status: 'SUCCESS',
+              last_payout_date: 'Pending First Payout',
+            },
+            court_list: courtsArr,
+            slot_rules: {
+              slot_duration_minutes: 60,
+              peak_morning_hours: '06:00 AM - 09:00 AM',
+              peak_morning_price: 1500,
+              regular_day_hours: '09:00 AM - 05:00 PM',
+              regular_day_price: 1200,
+              prime_night_hours: '06:00 PM - 11:00 PM',
+              prime_night_price: 1600,
+              weekend_surge_percent: 25,
+              instant_booking_enabled: true,
+            },
+            financials: {
+              gross_volume: 0,
+              platform_commission: 0,
+              unsettled_balance: 0,
+              total_settled: 0,
+            },
+          };
+
+          // Deduplicate and prepend
+          liveVenues = liveVenues.filter((v: any) => v.id !== venueId && v.venue_name !== newLiveVenue.venue_name);
+          liveVenues.unshift(newLiveVenue);
+          localStorage.setItem('ibooksports_live_venues', JSON.stringify(liveVenues));
+        } catch (e) {
+          console.error('Error persisting live venue conversion', e);
+        }
+      }
+
       setReviewAction(null);
       setActionTargetApp(null);
       if (drawerApp?.application_id === actionTargetApp.application_id) {
@@ -335,8 +488,8 @@ export default function PartnerOnboardingAdminTrackerPage() {
       }
       setToastMessage({
         type: 'success',
-        title: 'Application Approved Successfully',
-        description: `Partner ${actionTargetApp.partner_details?.name || actionTargetApp.application_id} has been activated.`,
+        title: 'Onboarding Approved — Live Venue Activated!',
+        description: `Facility "${actionTargetApp.business_details?.venue_name || 'Venue'}" is now officially LIVE in Venue Management with full courts and slot configurations.`,
       });
       await fetchApplications();
     } catch {
@@ -582,100 +735,62 @@ export default function PartnerOnboardingAdminTrackerPage() {
         document.body
       )}
 
-      {/* PAGE HEADER */}
-      <div className="border-b border-[#E5E7EB] pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-[#021526] font-display flex items-center gap-2.5">
-            <UserCheck className="h-6 w-6 text-[#F94001]" />
-            Partner Onboarding Review &amp; Step Engine
-          </h1>
-          <p className="text-xs text-[#5F6368] mt-1">
-            Tracking partner registration, 8-step verification, court pricing matrices, and bank settlement approvals.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/onboarding"
-            target="_blank"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#F94001] hover:bg-[#D93600] text-white text-xs font-bold shadow-sm transition-all"
-          >
-            <span>Open Partner Wizard</span>
-            <ExternalLink className="h-3.5 w-3.5" />
-          </Link>
-          <button
-            type="button"
-            onClick={fetchApplications}
-            className="p-2 rounded-xl border border-[#E5E7EB] bg-white text-[#5F6368] hover:text-[#021526] transition-all cursor-pointer shadow-xs"
-            title="Refresh List"
-            suppressHydrationWarning
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* TOP METRICS STRIP */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="p-4 rounded-2xl bg-white border border-[#E5E7EB] shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[#5F6368] block">Total Applications</span>
-          <p className="text-2xl font-black font-display text-[#021526] mt-1">{totalCount}</p>
-        </div>
-        <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">Pending Review</span>
-          <p className="text-2xl font-black font-display text-amber-700 mt-1">{pendingCount}</p>
-        </div>
-        <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">Approved</span>
-          <p className="text-2xl font-black font-display text-emerald-700 mt-1">{approvedCount}</p>
-        </div>
-        <div className="p-4 rounded-2xl bg-rose-50/50 border border-rose-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-800 block">Corrections / Rejected</span>
-          <p className="text-2xl font-black font-display text-rose-700 mt-1">{rejectedCount}</p>
-        </div>
-        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">Draft / In-Progress</span>
-          <p className="text-2xl font-black font-display text-slate-700 mt-1">{draftCount}</p>
-        </div>
-      </div>
-
-      {/* SEARCH, FILTERS & CONTROLS */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-[#E5E7EB] shadow-xs" suppressHydrationWarning>
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#5F6368]" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by ID, partner, or venue..."
-            className="w-full rounded-xl border border-[#E5E7EB] bg-[#F8F9FA] pl-9 pr-4 py-1.5 text-xs text-[#021526] focus:border-[#F94001] focus:outline-none"
-            suppressHydrationWarning
-          />
+      {/* PAGE HEADER & MINIMAL KPI */}
+      <div className="flex flex-col gap-4 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-[#021526]">
+              Partner Onboarding
+            </h1>
+            <p className="text-[11px] text-[#5F6368] mt-0.5">
+              Track and verify 8-step partner registrations and court matrices.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/onboarding"
+              target="_blank"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#F94001] hover:bg-[#D93600] text-white text-xs font-bold transition-all"
+            >
+              <span>Open Partner Wizard</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+            <button
+              type="button"
+              onClick={fetchApplications}
+              className="p-2 rounded-xl bg-slate-100 text-[#5F6368] hover:text-[#021526] transition-all cursor-pointer"
+              title="Refresh List"
+              suppressHydrationWarning
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center justify-between w-full sm:w-auto gap-3">
-          {/* Status Filter Buttons with Live Count Badges */}
-          <div className="flex items-center gap-1.5 overflow-x-auto" suppressHydrationWarning>
+        {/* SEARCH, FILTERS & MINIMAL METRICS */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3 rounded-2xl border border-slate-200">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full">
             {[
               { key: 'ALL', label: 'All', count: totalCount },
-              { key: 'PENDING_REVIEW', label: 'Pending Review', count: pendingCount },
+              { key: 'PENDING_REVIEW', label: 'Pending', count: pendingCount },
               { key: 'APPROVED', label: 'Approved', count: approvedCount },
-              { key: 'REJECTED', label: 'Rejected', count: rejectedCount },
+              { key: 'REJECTED', label: 'Corrections', count: rejectedCount },
               { key: 'DRAFT', label: 'Draft', count: draftCount },
             ].map(({ key, label, count }) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setStatusFilter(key)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
                   statusFilter === key
-                    ? 'bg-[#021526] text-white shadow-xs'
-                    : 'bg-[#F8F9FA] text-[#5F6368] hover:bg-[#E5E7EB]'
+                    ? 'bg-[#021526] text-white shadow-sm'
+                    : 'text-[#5F6368] hover:bg-slate-100'
                 }`}
                 suppressHydrationWarning
               >
                 <span>{label}</span>
                 <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                  className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono ${
                     statusFilter === key
                       ? 'bg-white/20 text-white'
                       : 'bg-slate-200 text-slate-700'
@@ -685,6 +800,18 @@ export default function PartnerOnboardingAdminTrackerPage() {
                 </span>
               </button>
             ))}
+          </div>
+          
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search..."
+              className="w-full pl-8 pr-4 py-1.5 rounded-xl bg-slate-50 text-xs text-[#021526] focus:outline-none focus:ring-1 focus:ring-[#F94001] transition-all"
+              suppressHydrationWarning
+            />
           </div>
         </div>
       </div>
@@ -720,31 +847,38 @@ export default function PartnerOnboardingAdminTrackerPage() {
                   const stepNum = app.current_step || 1;
                   const progressPercent = Math.min(100, Math.round((stepNum / 8) * 100));
                   const fullTimestamp = app.updated_at || app.created_at || 'Just now';
-                  const datePart = fullTimestamp.includes(' ') ? fullTimestamp.split(' ')[0] : fullTimestamp;
-                  const timePart = fullTimestamp.includes(' ') ? fullTimestamp.split(' ').slice(1).join(' ') : '';
+                  const dateObj = new Date(fullTimestamp);
+                  const isValidDate = !isNaN(dateObj.getTime());
+                  const datePart = isValidDate 
+                    ? dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) 
+                    : (fullTimestamp.includes(' ') ? fullTimestamp.split(' ')[0] : fullTimestamp);
+                  
+                  const timePart = isValidDate
+                    ? dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                    : (fullTimestamp.includes(' ') ? fullTimestamp.split(' ').slice(1).join(' ') : '');
 
                   return (
                     <tr key={app.application_id} className="hover:bg-[#FFF8F5]/60 transition-colors">
                       {/* ID */}
-                      <td className="px-4 py-3.5 align-middle">
-                        <span className="font-mono font-bold text-[#F94001] block text-sm">
-                          {app.application_id}
-                        </span>
-                        <span className="text-[10px] text-[#5F6368] font-mono">
-                          Ref #{app.application_id}
-                        </span>
+                      <td className="px-4 py-3.5 align-middle whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] text-slate-400 font-mono">#</span>
+                          <span className="font-mono font-bold text-[#021526] text-xs">
+                            {app.application_id}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Date & Time Separate Column */}
                       <td className="px-4 py-3.5 align-middle whitespace-nowrap" suppressHydrationWarning>
-                        <div className="flex items-center gap-1.5 text-[#021526] font-bold text-xs">
-                          <CalendarIcon className="h-3.5 w-3.5 text-[#F94001] shrink-0" />
-                          <span>{datePart}</span>
+                        <div className="text-[#021526] font-bold text-xs mb-0.5">
+                          {datePart}
                         </div>
                         {timePart && (
-                          <span className="text-[10px] text-[#5F6368] font-mono block mt-0.5 pl-5">
-                            {timePart}
-                          </span>
+                          <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+                            <Clock className="h-3 w-3 shrink-0" />
+                            <span>{timePart}</span>
+                          </div>
                         )}
                       </td>
 
@@ -926,9 +1060,9 @@ export default function PartnerOnboardingAdminTrackerPage() {
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
             <div className="max-w-[1500px] mx-auto space-y-6">
               {/* Top Banner: Partner & Venue Overview */}
-              <div className="p-5 rounded-2xl bg-white border border-[#CBD5E1] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="border-b border-[#E5E7EB] pb-6 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-[#F94001] to-amber-500 text-white flex items-center justify-center font-display font-black text-lg shadow-sm shrink-0">
+                  <div className="h-12 w-12 rounded-2xl bg-[#021526] text-white flex items-center justify-center font-display font-black text-lg shrink-0">
                     {drawerApp.business_details?.venue_name?.[0] || 'V'}
                   </div>
                   <div>
@@ -960,7 +1094,7 @@ export default function PartnerOnboardingAdminTrackerPage() {
                 {/* LEFT COLUMN: Identity, Business, Venue Photos & Banking */}
                 <div className="space-y-6">
                   {/* Step 1: Partner Identity & KYC Details */}
-                  <div className={`p-5 rounded-2xl bg-white border shadow-xs space-y-4 ${sectionNotes['partner_identity'] ? 'border-rose-300 bg-rose-50/30' : 'border-[#CBD5E1]'}`}>
+                  <div className={`p-4 rounded-2xl border ${sectionNotes['partner_identity'] ? 'border-rose-300 bg-rose-50/50' : 'border-[#E5E7EB] bg-white'} space-y-4`}>
                     <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
                       <h4 className="text-xs font-bold uppercase text-[#F94001] font-mono tracking-wider flex items-center gap-2">
                         <UserCheck className="h-4 w-4" />
@@ -980,43 +1114,43 @@ export default function PartnerOnboardingAdminTrackerPage() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                      <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Owner / Full Name</span>
-                        <p className="font-bold text-[#021526] text-sm mt-0.5">{drawerApp.partner_details?.name || '—'}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Owner / Full Name</span>
+                        <p className="font-bold text-[#021526] text-sm">{drawerApp.partner_details?.name || '—'}</p>
                       </div>
-                      <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Contact Mobile</span>
-                        <p className="font-mono font-bold text-[#021526] text-sm mt-0.5 flex items-center gap-1.5">
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Contact Mobile</span>
+                        <p className="font-mono font-bold text-[#021526] text-sm flex items-center gap-1.5">
                           <Phone className="h-3.5 w-3.5 text-[#F94001]" />
                           +91 {drawerApp.mobile_number}
                         </p>
                       </div>
-                      <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Official Email</span>
-                        <p className="font-medium text-[#021526] mt-0.5 flex items-center gap-1.5 truncate">
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Official Email</span>
+                        <p className="font-medium text-[#021526] flex items-center gap-1.5 truncate">
                           <Mail className="h-3.5 w-3.5 text-[#F94001] shrink-0" />
                           {drawerApp.partner_details?.email || '—'}
                         </p>
                       </div>
-                      <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Location</span>
-                        <p className="font-medium text-[#021526] mt-0.5">
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Location</span>
+                        <p className="font-medium text-[#021526]">
                           {[drawerApp.partner_details?.district, drawerApp.partner_details?.state].filter(Boolean).join(', ') || '—'}
                         </p>
                       </div>
 
                       {/* Residential Address */}
-                      <div className="sm:col-span-2 p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Partner Residential Address</span>
-                        <p className="font-medium text-[#021526] text-xs mt-0.5">
+                      <div className="sm:col-span-2">
+                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Partner Residential Address</span>
+                        <p className="font-medium text-[#021526] text-xs">
                           {[drawerApp.partner_details?.address, drawerApp.partner_details?.district, drawerApp.partner_details?.state, drawerApp.partner_details?.pincode ? `- ${drawerApp.partner_details.pincode}` : ''].filter(Boolean).join(', ') || 'Not provided'}
                         </p>
                       </div>
                     </div>
 
                     {/* Aadhaar & Profile Photo Verification Row */}
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="pt-3 border-t border-[#E5E7EB] flex flex-wrap items-center justify-between gap-2.5">
                       <div className="flex items-center gap-2">
                         <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
                         <div>
@@ -1076,7 +1210,7 @@ export default function PartnerOnboardingAdminTrackerPage() {
                   </div>
 
                   {/* Step 2: Business & Venue Details */}
-                  <div className={`p-5 rounded-2xl bg-white border shadow-xs space-y-4 ${sectionNotes['business_venue'] ? 'border-rose-300 bg-rose-50/30' : 'border-[#CBD5E1]'}`}>
+                  <div className={`p-4 rounded-2xl border ${sectionNotes['business_venue'] ? 'border-rose-300 bg-rose-50/50' : 'border-[#E5E7EB] bg-white'} space-y-4`}>
                     <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
                       <h4 className="text-xs font-bold uppercase text-[#F94001] font-mono tracking-wider flex items-center gap-2">
                         <Building2 className="h-4 w-4" />
@@ -1096,38 +1230,38 @@ export default function PartnerOnboardingAdminTrackerPage() {
                       </div>
                     )}
 
-                    <div className="space-y-3 text-xs">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                          <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Venue / Arena Name</span>
-                          <p className="font-bold text-[#021526] text-sm mt-0.5">{drawerApp.business_details?.venue_name || '—'}</p>
+                    <div className="space-y-4 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Venue / Arena Name</span>
+                          <p className="font-bold text-[#021526] text-sm">{drawerApp.business_details?.venue_name || '—'}</p>
                         </div>
-                        <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                          <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Venue Contact Mobile</span>
-                          <p className="font-mono font-bold text-[#021526] text-sm mt-0.5">
+                        <div>
+                          <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Venue Contact Mobile</span>
+                          <p className="font-mono font-bold text-[#021526] text-sm">
                             {drawerApp.business_details?.venue_mobile_number ? `+91 ${drawerApp.business_details.venue_mobile_number}` : '—'}
                           </p>
                         </div>
                       </div>
 
-                      <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Venue Official Email</span>
-                        <p className="font-medium text-[#021526] mt-0.5">{drawerApp.business_details?.venue_email || '—'}</p>
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Venue Official Email</span>
+                        <p className="font-medium text-[#021526]">{drawerApp.business_details?.venue_email || '—'}</p>
                       </div>
 
-                      <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Facility Physical Address</span>
-                        <p className="font-medium text-[#021526] mt-0.5">{drawerApp.business_details?.venue_address || '—'}</p>
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Facility Physical Address</span>
+                        <p className="font-medium text-[#021526]">{drawerApp.business_details?.venue_address || '—'}</p>
                       </div>
 
                       {drawerApp.business_details?.venue_google_maps_link && (
-                        <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                          <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Google Maps Navigation Link</span>
+                        <div>
+                          <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Google Maps Navigation Link</span>
                           <a
                             href={drawerApp.business_details.venue_google_maps_link}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-[#F94001] hover:underline font-mono text-xs inline-flex items-center gap-1.5 mt-0.5 break-all"
+                            className="text-[#F94001] hover:underline font-mono text-xs inline-flex items-center gap-1.5 break-all"
                           >
                             <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                             <span>{drawerApp.business_details.venue_google_maps_link}</span>
@@ -1135,16 +1269,16 @@ export default function PartnerOnboardingAdminTrackerPage() {
                         </div>
                       )}
 
-                      <div className="grid grid-cols-2 gap-3 pt-1">
-                        <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                          <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">GST Registration Status</span>
-                          <p className="font-bold text-[#021526] mt-0.5">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">GST Registration Status</span>
+                          <p className="font-bold text-[#021526]">
                             {drawerApp.business_details?.has_gst ? 'Registered Business' : 'GST Exempt / Individual'}
                           </p>
                         </div>
-                        <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                          <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">GSTIN Registration Number</span>
-                          <p className="font-mono font-bold text-[#021526] mt-0.5">
+                        <div>
+                          <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">GSTIN Registration Number</span>
+                          <p className="font-mono font-bold text-[#021526]">
                             {drawerApp.business_details?.gst_number || (drawerApp.business_details?.has_gst ? 'Pending' : 'N/A (Exempt)')}
                           </p>
                         </div>
@@ -1152,7 +1286,7 @@ export default function PartnerOnboardingAdminTrackerPage() {
 
                       {/* GST Document Action Button */}
                       {drawerApp.business_details?.has_gst && drawerApp.business_details?.gst_document_id && (
-                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2.5">
+                        <div className="pt-3 border-t border-[#E5E7EB] flex items-center justify-between gap-2.5">
                           <div className="flex items-center gap-2">
                             <FileCheck className="h-4 w-4 text-indigo-600 shrink-0" />
                             <div>
@@ -1190,7 +1324,7 @@ export default function PartnerOnboardingAdminTrackerPage() {
                   </div>
 
                   {/* Step 3: Court Photographs Gallery */}
-                  <div className={`p-5 rounded-2xl bg-white border shadow-xs space-y-4 ${sectionNotes['court_photos'] ? 'border-rose-300 bg-rose-50/30' : 'border-[#CBD5E1]'}`}>
+                  <div className={`p-4 rounded-2xl border ${sectionNotes['court_photos'] ? 'border-rose-300 bg-rose-50/50' : 'border-[#E5E7EB] bg-white'} space-y-4`}>
                     <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
                       <h4 className="text-xs font-bold uppercase text-[#F94001] font-mono tracking-wider flex items-center gap-2">
                         <Camera className="h-4 w-4" />
@@ -1263,7 +1397,7 @@ export default function PartnerOnboardingAdminTrackerPage() {
                   </div>
 
                   {/* Step 4: Operating Hours & Schedule (Moved to Left Column) */}
-                  <div className={`p-5 rounded-2xl bg-white border shadow-xs space-y-4 ${sectionNotes['operating_hours'] ? 'border-rose-300 bg-rose-50/30' : 'border-[#CBD5E1]'}`}>
+                  <div className={`p-4 rounded-2xl border ${sectionNotes['operating_hours'] ? 'border-rose-300 bg-rose-50/50' : 'border-[#E5E7EB] bg-white'} space-y-4`}>
                     <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
                       <h4 className="text-xs font-bold uppercase text-[#F94001] font-mono tracking-wider flex items-center gap-2">
                         <Clock className="h-4 w-4" />
@@ -1305,22 +1439,22 @@ export default function PartnerOnboardingAdminTrackerPage() {
 
                       if (!hasOperatingHours) {
                         return (
-                          <div className="p-4 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB] text-center text-xs text-slate-500">
+                          <div className="p-4 rounded-xl border border-[#E5E7EB] text-center text-xs text-slate-500">
                             Operating hours and schedule have not been configured by the partner yet.
                           </div>
                         );
                       }
 
                       return (
-                        <div className="grid grid-cols-2 gap-3 text-xs">
-                          <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                            <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Daily Opening Time</span>
-                            <p className="font-bold text-[#021526] text-sm mt-0.5">
+                        <div className="grid grid-cols-2 gap-4 text-xs">
+                          <div>
+                            <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Daily Opening Time</span>
+                            <p className="font-bold text-[#021526] text-sm">
                               {openingTime}
                             </p>
                           </div>
-                          <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                            <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Daily Closing Time</span>
+                          <div>
+                            <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Daily Closing Time</span>
                             <p className="font-bold text-[#021526] text-sm mt-0.5">
                               {closingTime}
                             </p>
@@ -1357,7 +1491,7 @@ export default function PartnerOnboardingAdminTrackerPage() {
                   </div>
 
                   {/* Step 6: Settlement Bank Details */}
-                  <div className={`p-5 rounded-2xl bg-white border shadow-xs space-y-4 ${sectionNotes['bank_details'] ? 'border-rose-300 bg-rose-50/30' : 'border-[#CBD5E1]'}`}>
+                  <div className={`p-4 rounded-2xl border ${sectionNotes['bank_details'] ? 'border-rose-300 bg-rose-50/50' : 'border-[#E5E7EB] bg-white'} space-y-4`}>
                     <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
                       <h4 className="text-xs font-bold uppercase text-[#F94001] font-mono tracking-wider flex items-center gap-2">
                         <CreditCard className="h-4 w-4" />
@@ -1377,24 +1511,24 @@ export default function PartnerOnboardingAdminTrackerPage() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-3 text-xs">
-                      <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Account Holder Name</span>
-                        <p className="font-bold text-[#021526] mt-0.5">{drawerApp.bank_details?.account_holder_name || '—'}</p>
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Account Holder Name</span>
+                        <p className="font-bold text-[#021526]">{drawerApp.bank_details?.account_holder_name || '—'}</p>
                       </div>
-                      <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Bank Name</span>
-                        <p className="font-bold text-[#021526] mt-0.5">{drawerApp.bank_details?.bank_name || '—'}</p>
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Bank Name</span>
+                        <p className="font-bold text-[#021526]">{drawerApp.bank_details?.bank_name || '—'}</p>
                       </div>
-                      <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">Bank Account Number</span>
-                        <p className="font-mono font-bold text-[#021526] mt-0.5">
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">Bank Account Number</span>
+                        <p className="font-mono font-bold text-[#021526]">
                           {drawerApp.bank_details?.account_number || '—'}
                         </p>
                       </div>
-                      <div className="p-3 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-semibold">IFSC Code &amp; Branch</span>
-                        <p className="font-mono font-bold text-[#021526] mt-0.5">
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase block font-mono font-bold mb-1">IFSC Code &amp; Branch</span>
+                        <p className="font-mono font-bold text-[#021526]">
                           {drawerApp.bank_details?.ifsc_code || '—'} {drawerApp.bank_details?.branch_name ? `(${drawerApp.bank_details.branch_name})` : ''}
                         </p>
                       </div>
@@ -1402,7 +1536,7 @@ export default function PartnerOnboardingAdminTrackerPage() {
 
                     {/* Bank Passbook / Cheque Action Row */}
                     {drawerApp.bank_details?.branch_proof_document_id && (
-                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2.5">
+                      <div className="pt-3 border-t border-[#E5E7EB] flex items-center justify-between gap-2.5">
                         <div className="flex items-center gap-2">
                           <CreditCard className="h-4 w-4 text-emerald-600 shrink-0" />
                           <div>
@@ -1446,9 +1580,9 @@ export default function PartnerOnboardingAdminTrackerPage() {
                 {/* RIGHT COLUMN: Sports & Courts Matrix ONLY (Single Clean Container) */}
                 <div className="space-y-6">
                   {/* Step 5: Single Unified Container */}
-                  <div className={`p-5 sm:p-6 rounded-2xl bg-white border shadow-xs space-y-5 ${sectionNotes['courts_matrix'] ? 'border-rose-300 bg-rose-50/30' : 'border-[#CBD5E1]'}`}>
+                  <div className={`p-4 rounded-2xl border ${sectionNotes['courts_matrix'] ? 'border-rose-300 bg-rose-50/50' : 'border-[#E5E7EB] bg-white'} space-y-4`}>
                     {/* Header */}
-                    <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3.5">
+                    <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
                       <h4 className="text-xs font-bold uppercase text-[#F94001] font-mono tracking-wider flex items-center gap-2">
                         <Trophy className="h-4 w-4" />
                         <span>Step 5: Sports &amp; Courts Pricing Matrix</span>

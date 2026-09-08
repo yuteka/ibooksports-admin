@@ -23,6 +23,12 @@ import {
   CheckCheck,
   Clock,
   Sparkles,
+  Users,
+  CalendarCheck,
+  CreditCard,
+  Landmark,
+  Headphones,
+  LogOut,
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
@@ -75,48 +81,105 @@ const DEFAULT_NOTIFICATIONS: AdminNotification[] = [
   },
 ];
 
-const NAV_ITEMS = [
+export interface NavItemConfig {
+  label: string;
+  href: string;
+  icon: React.ElementType;
+  badge?: string | null;
+}
+
+export interface NavSectionConfig {
+  title: string;
+  items: NavItemConfig[];
+}
+
+const NAV_SECTIONS: NavSectionConfig[] = [
   {
-    label: 'Dashboard',
-    href: '/admin',
-    icon: LayoutDashboard,
-    badge: null,
+    title: 'Core Operations',
+    items: [
+      {
+        label: 'Dashboard',
+        href: '/admin',
+        icon: LayoutDashboard,
+        badge: null,
+      },
+      {
+        label: 'Partner Requests',
+        href: '/admin/requests',
+        icon: Inbox,
+        badge: '4 New',
+      },
+      {
+        label: 'Partner Onboarding',
+        href: '/admin/onboarding',
+        icon: UserCheck,
+        badge: null,
+      },
+      {
+        label: 'Venue Management',
+        href: '/admin/venues',
+        icon: Building2,
+        badge: '3 Active',
+      },
+      {
+        label: 'Court Requests',
+        href: '/admin/court-requests',
+        icon: Trophy,
+        badge: null,
+      },
+    ],
   },
   {
-    label: 'Partner Requests',
-    href: '/admin/requests',
-    icon: Inbox,
-    badge: '4 New',
+    title: 'Turf & Business',
+    items: [
+      {
+        label: 'Customer Management',
+        href: '/admin/customers',
+        icon: Users,
+        badge: '6 Users',
+      },
+      {
+        label: 'Booking Management',
+        href: '/admin/bookings',
+        icon: CalendarCheck,
+        badge: 'Live',
+      },
+      {
+        label: 'Payment Management',
+        href: '/admin/payments',
+        icon: CreditCard,
+        badge: null,
+      },
+      {
+        label: 'Settlement Management',
+        href: '/admin/settlements',
+        icon: Landmark,
+        badge: '2 Due',
+      },
+      {
+        label: 'Support Helpdesk',
+        href: '/admin/support',
+        icon: Headphones,
+        badge: '2 Open',
+      },
+    ],
   },
   {
-    label: 'Partner Onboarding',
-    href: '/admin/onboarding',
-    icon: UserCheck,
-    badge: null,
-  },
-  {
-    label: 'Venue Management',
-    href: '/admin/venues',
-    icon: Building2,
-    badge: null,
-  },
-  {
-    label: 'Court Requests',
-    href: '/admin/court-requests',
-    icon: Trophy,
-    badge: null,
-  },
-  {
-    label: 'CMS & Policies',
-    href: '/admin/cms',
-    icon: FileText,
-    badge: 'Vendor',
-  },
-  {
-    label: 'Settings & Support',
-    href: '/admin/settings',
-    icon: Settings,
-    badge: null,
+    title: 'Platform & Settings',
+    items: [
+      {
+        label: 'Settings & Config',
+        href: '/admin/settings',
+        icon: Settings,
+        badge: '8 Tabs',
+      },
+      {
+        label: 'CMS & Policies',
+        href: '/admin/cms',
+        icon: FileText,
+        badge: 'Live',
+      },
+    ],
   },
 ];
 
@@ -164,11 +227,12 @@ export default function AdminLayout({
     };
   }, [pathname]);
 
-  const getBadgeText = (item: (typeof NAV_ITEMS)[number]) => {
+  const getBadgeText = (item: NavItemConfig) => {
     if (item.href === '/admin/requests') {
-      if (submittedCount !== null) {
+      if (submittedCount !== null && submittedCount > 0) {
         return `${submittedCount} NEW`;
       }
+      return '4 NEW';
     }
     if (item.href === '/admin/court-requests') {
       if (courtRequestsCount !== null && courtRequestsCount > 0) {
@@ -201,6 +265,11 @@ export default function AdminLayout({
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
   };
+
+  // Do not render admin header or sidebar on login page
+  if (pathname === '/admin/login') {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#021526] flex flex-col font-sans antialiased" suppressHydrationWarning>
@@ -251,14 +320,17 @@ export default function AdminLayout({
 
           {/* Quick Search */}
           <div className="hidden md:flex items-center flex-1 max-w-md mx-6">
-            <div className="relative w-full">
-              <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+            <div className="relative w-full flex items-center">
+              <Search className="absolute left-3.5 h-4 w-4 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search requests, venues, partners..."
-                className="w-full rounded-xl bg-[#06243f] border border-[#0a2e4e] pl-10 pr-4 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#F94001] focus:ring-1 focus:ring-[#F94001] transition-all"
+                className="w-full rounded-xl bg-[#06243f] border border-[#0a2e4e] pl-10 pr-12 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#F94001] focus:ring-1 focus:ring-[#F94001] transition-all"
                 suppressHydrationWarning
               />
+              <kbd className="absolute right-2.5 px-1.5 py-0.5 text-[9px] font-mono font-semibold bg-[#021526] text-slate-400 rounded border border-slate-700 select-none pointer-events-none">
+                ⌘K
+              </kbd>
             </div>
           </div>
 
@@ -398,20 +470,35 @@ export default function AdminLayout({
 
             <div className="h-5 w-px bg-slate-700 hidden sm:block" />
 
-            {/* Admin Profile */}
-            <div className="flex items-center gap-2.5 pl-1">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-[#F94001] to-[#D93600] flex items-center justify-center text-white text-xs font-black shadow-sm shrink-0">
-                SA
+            {/* Admin Profile & Logout */}
+            <div className="flex items-center gap-2 pl-1">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-[#F94001] to-[#D93600] flex items-center justify-center text-white text-xs font-black shadow-sm shrink-0">
+                  SA
+                </div>
+                <div className="hidden sm:flex flex-col text-left">
+                  <span className="text-xs font-bold text-white leading-tight">
+                    Super Admin
+                  </span>
+                  <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-medium">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />{' '}
+                    Live Session
+                  </span>
+                </div>
               </div>
-              <div className="hidden sm:flex flex-col text-left">
-                <span className="text-xs font-bold text-white leading-tight">
-                  Super Admin
-                </span>
-                <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-medium">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />{' '}
-                  Live System
-                </span>
-              </div>
+
+              <Link
+                href="/admin/login"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('ibooksports_admin_auth');
+                  }
+                }}
+                className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-white/10 transition-colors ml-1"
+                title="Sign out of admin console"
+              >
+                <LogOut className="h-4 w-4" />
+              </Link>
             </div>
           </div>
         </div>
@@ -421,58 +508,78 @@ export default function AdminLayout({
       <div className="flex-1 flex w-full">
         {/* SIDEBAR NAVIGATION (DESKTOP) - FLUSH LEFT */}
         <aside className="hidden lg:block w-64 xl:w-72 shrink-0 bg-white border-r border-[#E5E7EB] min-h-[calc(100vh-4rem)]">
-          <div className="p-4 xl:p-6 space-y-1 sticky top-20">
-            <p className="px-3 text-[11px] font-bold uppercase tracking-wider text-[#5F6368] mb-3 font-display">
-              Main Navigation
-            </p>
+          <div className="p-4 xl:p-5 space-y-5 sticky top-20 max-h-[calc(100vh-5rem)] overflow-y-auto">
+            {NAV_SECTIONS.map((section, sIdx) => (
+              <div key={sIdx} className="space-y-1">
+                <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-[#5F6368] mb-2 font-display">
+                  {section.title}
+                </p>
 
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive =
-                item.href === '/admin'
-                  ? pathname === '/admin'
-                  : pathname.startsWith(item.href);
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive =
+                    item.href === '/admin'
+                      ? pathname === '/admin'
+                      : pathname.startsWith(item.href);
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                    isActive
-                      ? 'bg-[#FFF1EC] text-[#F94001] font-bold shadow-xs border-l-4 border-[#F94001]'
-                      : 'text-[#021526] hover:bg-[#F3F4F4] hover:text-[#F94001]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon
-                      className={`h-4 w-4 ${
-                        isActive ? 'text-[#F94001]' : 'text-[#5F6368]'
-                      }`}
-                    />
-                    <span>{item.label}</span>
-                  </div>
-
-                  {getBadgeText(item) && (
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 ${
                         isActive
-                          ? 'bg-[#F94001] text-white'
-                          : 'bg-[#F3F4F4] text-[#021526] border border-[#E5E7EB]'
+                          ? 'bg-[#021526] text-white font-semibold shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
                       }`}
                     >
-                      {getBadgeText(item)}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
+                      <div className="flex items-center gap-2.5">
+                        <Icon
+                          className={`h-4 w-4 ${
+                            isActive ? 'text-[#F94001]' : 'text-slate-400'
+                          }`}
+                        />
+                        <span>{item.label}</span>
+                      </div>
+
+                      {getBadgeText(item) && (
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono ${
+                            isActive
+                              ? 'bg-[#F94001] text-white'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          {getBadgeText(item)}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+
+            {/* Minimal SaaS System Status Box */}
+            <div className="pt-3 border-t border-slate-100">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Live Network</span>
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 font-mono">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    99.9% Uptime
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  All 4 Arena clusters operational
+                </p>
+              </div>
+            </div>
           </div>
         </aside>
 
         {/* MOBILE MENU DRAWER */}
         {isMobileMenuOpen && (
           <div className="fixed inset-0 z-50 lg:hidden bg-black/60 backdrop-blur-xs flex">
-            <div className="w-72 max-w-[80vw] bg-white h-full p-5 space-y-4 shadow-2xl flex flex-col justify-between animate-in slide-in-from-left">
+            <div className="w-72 max-w-[85vw] bg-white h-full p-5 space-y-4 shadow-2xl flex flex-col justify-between animate-in slide-in-from-left overflow-y-auto">
               <div>
                 <div className="flex items-center justify-between pb-4 border-b border-[#E5E7EB]">
                   <div className="flex items-center gap-2.5">
@@ -496,48 +603,68 @@ export default function AdminLayout({
                   </button>
                 </div>
 
-                <div className="mt-4 space-y-1">
-                  {NAV_ITEMS.map((item) => {
-                    const Icon = item.icon;
-                    const isActive =
-                      item.href === '/admin'
-                        ? pathname === '/admin'
-                        : pathname.startsWith(item.href);
+                <div className="mt-4 space-y-4">
+                  {NAV_SECTIONS.map((section, sIdx) => (
+                    <div key={sIdx} className="space-y-1">
+                      <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-[#5F6368] mb-1.5 font-display">
+                        {section.title}
+                      </p>
+                      {section.items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive =
+                          item.href === '/admin'
+                            ? pathname === '/admin'
+                            : pathname.startsWith(item.href);
 
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold ${
-                          isActive
-                            ? 'bg-[#FFF1EC] text-[#F94001] font-bold border-l-4 border-[#F94001]'
-                            : 'text-[#021526] hover:bg-[#F3F4F4]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon
-                            className={`h-4 w-4 ${
-                              isActive ? 'text-[#F94001]' : 'text-[#5F6368]'
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold ${
+                              isActive
+                                ? 'bg-[#FFF1EC] text-[#F94001] font-bold border-l-4 border-[#F94001]'
+                                : 'text-[#021526] hover:bg-[#F3F4F4]'
                             }`}
-                          />
-                          <span>{item.label}</span>
-                        </div>
-                        {getBadgeText(item) && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#F94001] text-white font-bold">
-                            {getBadgeText(item)}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <Icon
+                                className={`h-4 w-4 ${
+                                  isActive ? 'text-[#F94001]' : 'text-[#5F6368]'
+                                }`}
+                              />
+                              <span>{item.label}</span>
+                            </div>
+                            {getBadgeText(item) && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#F94001] text-white font-bold">
+                                {getBadgeText(item)}
+                              </span>
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-[#E5E7EB]">
-                <div className="text-[11px] text-slate-400 text-center">
-                  iBookSports v1.0.0 • Admin Portal
-                </div>
+              <div className="pt-3 border-t border-[#E5E7EB] flex items-center justify-between text-xs">
+                <span className="text-[11px] text-slate-400">
+                  iBookSports v2.4 Admin
+                </span>
+                <Link
+                  href="/admin/login"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    if (typeof window !== 'undefined') {
+                      localStorage.removeItem('ibooksports_admin_auth');
+                    }
+                  }}
+                  className="text-rose-600 font-bold flex items-center gap-1 hover:underline text-[11px]"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  Sign Out
+                </Link>
               </div>
             </div>
             <div

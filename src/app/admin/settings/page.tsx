@@ -47,6 +47,12 @@ import {
   Layers,
   Plus,
   Building2,
+  Sliders,
+  Smartphone,
+  Globe,
+  Key,
+  EyeOff,
+  Save,
 } from 'lucide-react';
 import {
   staffApi,
@@ -58,6 +64,7 @@ import {
   SportItem,
   AmenityItem,
 } from '@/lib/api';
+import { INITIAL_AUDIT_LOGS } from '@/lib/mockData';
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Trophy,
@@ -117,9 +124,76 @@ const DEFAULT_ROLES: RoleMetadata[] = [
   },
 ];
 
+export type SettingsTab =
+  | 'organization'
+  | 'module_config'
+  | 'sports'
+  | 'vendor_cms'
+  | 'customer_cms'
+  | 'staff'
+  | 'audit_log'
+  | 'api';
+
 export default function AdminSettingsPage() {
-  const [activeTab, setActiveTab] = useState<'staff' | 'sports' | 'emails' | 'support' | 'system'>('staff');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('organization');
   const [sportsSubTab, setSportsSubTab] = useState<'SPORTS' | 'AMENITIES'>('SPORTS');
+
+  // Organization Settings State
+  const [orgForm, setOrgForm] = useState({
+    legal_name: 'iBookSports Technology Solutions Pvt Ltd',
+    brand_name: 'iBookSports',
+    gstin: '33AABCI9912K1Z8',
+    pan: 'AABCI9912K',
+    address: '4th Floor, Tech Innovation Park, Peelamedu, Coimbatore, Tamil Nadu - 641014',
+    support_email: 'support@ibooksports.com',
+    support_phone: '+91 94888 12345',
+    currency: 'INR (₹)',
+    timezone: 'Asia/Kolkata (IST +05:30)',
+  });
+
+  // Module Config Settings State
+  const [moduleConfig, setModuleConfig] = useState({
+    instant_booking: true,
+    advance_booking_days: 30,
+    cancellation_grace_hours: 4,
+    platform_fee_percent: 10,
+    dynamic_prime_surge: true,
+    otp_booking_verification: true,
+    maintenance_mode: false,
+  });
+
+  // Vendor App CMS State
+  const [vendorCms, setVendorCms] = useState({
+    announcement_title: 'Partner Monsoon Turf Boost 2026',
+    announcement_body: 'Host 50+ night slots this month and receive 0% tech fee on box cricket bookings!',
+    banner_active: true,
+    partner_agreement_version: 'v2.4 - 90/10 Split Agreement',
+    payout_schedule_note: 'Daily rolling T+2 payout cycles directly to verified IMPS bank account.',
+  });
+
+  // Customer Side CMS State
+  const [customerCms, setCustomerCms] = useState({
+    hero_title: 'Play Better, Book Faster with iBookSports',
+    hero_subtitle: 'Discover top FIFA astroturfs, box cricket arenas & indoor badminton courts near you.',
+    promo_ticker: '⚡ 10,000+ matches played! Instant booking available across 45+ turfs in Tamil Nadu & Karnataka.',
+    featured_sports: ['Football', 'Box Cricket', 'Badminton', 'Pickleball', 'Tennis'],
+    featured_turfs: [
+      'Sky Sports Arena & Box Turf (Coimbatore)',
+      'Green Field Sports Park (Chennai)',
+      'Apex Arena & Sports Club (Bengaluru)',
+    ],
+  });
+
+  // API & Webhooks State
+  const [apiKeyProd] = useState('ibs_live_8912409817240182904');
+  const [apiSecretProd] = useState('sec_live_9918237198274198234');
+  const [showSecret, setShowSecret] = useState(false);
+  const [razorpayWebhook, setRazorpayWebhook] = useState('https://api.ibooksports.com/v1/webhooks/razorpay');
+  const [razorpaySecret] = useState('whsec_rzp_live_981240981');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Audit Logs State
+  const [auditLogs] = useState(INITIAL_AUDIT_LOGS);
 
   // Sports & Amenities State
   const [sportsList, setSportsList] = useState<SportItem[]>([]);
@@ -626,32 +700,38 @@ export default function AdminSettingsPage() {
         )}
       </div>
 
-      {/* TABS NAVIGATION */}
-      <div className="flex items-center gap-2 border-b border-[#E5E7EB] pb-px overflow-x-auto">
+      {/* TABS NAVIGATION - 8 SUBMODULES */}
+      <div className="flex items-center gap-1.5 border-b border-[#E5E7EB] pb-px overflow-x-auto scrollbar-none">
         <button
           type="button"
-          onClick={() => setActiveTab('staff')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'staff'
+          onClick={() => setActiveTab('organization')}
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'organization'
               ? 'border-[#F94001] text-[#F94001]'
               : 'border-transparent text-[#5F6368] hover:text-[#021526]'
           }`}
         >
-          <Users className="h-4 w-4" />
-          <span>Staff & Team Management</span>
-          <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-              activeTab === 'staff' ? 'bg-[#FFF1EC] text-[#F94001]' : 'bg-[#E5E7EB] text-[#5F6368]'
-            }`}
-          >
-            {staffList.length}
-          </span>
+          <Building2 className="h-4 w-4" />
+          <span>Organization</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('module_config')}
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'module_config'
+              ? 'border-[#F94001] text-[#F94001]'
+              : 'border-transparent text-[#5F6368] hover:text-[#021526]'
+          }`}
+        >
+          <Sliders className="h-4 w-4" />
+          <span>Module Config</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('sports')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
             activeTab === 'sports'
               ? 'border-[#F94001] text-[#F94001]'
               : 'border-transparent text-[#5F6368] hover:text-[#021526]'
@@ -660,7 +740,7 @@ export default function AdminSettingsPage() {
           <Trophy className="h-4 w-4" />
           <span>Sports & Amenities</span>
           <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+            className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
               activeTab === 'sports' ? 'bg-[#FFF1EC] text-[#F94001]' : 'bg-[#E5E7EB] text-[#5F6368]'
             }`}
           >
@@ -670,32 +750,638 @@ export default function AdminSettingsPage() {
 
         <button
           type="button"
-          onClick={() => setActiveTab('support')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'support'
+          onClick={() => setActiveTab('vendor_cms')}
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'vendor_cms'
               ? 'border-[#F94001] text-[#F94001]'
               : 'border-transparent text-[#5F6368] hover:text-[#021526]'
           }`}
         >
-          <LifeBuoy className="h-4 w-4" />
-          <span>Partner Support Channels</span>
+          <Smartphone className="h-4 w-4" />
+          <span>Vendor App CMS</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setActiveTab('system')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'system'
+          onClick={() => setActiveTab('customer_cms')}
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'customer_cms'
+              ? 'border-[#F94001] text-[#F94001]'
+              : 'border-transparent text-[#5F6368] hover:text-[#021526]'
+          }`}
+        >
+          <Globe className="h-4 w-4" />
+          <span>Customer Side CMS</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('staff')}
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'staff'
+              ? 'border-[#F94001] text-[#F94001]'
+              : 'border-transparent text-[#5F6368] hover:text-[#021526]'
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          <span>Staff & Roles</span>
+          <span
+            className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+              activeTab === 'staff' ? 'bg-[#FFF1EC] text-[#F94001]' : 'bg-[#E5E7EB] text-[#5F6368]'
+            }`}
+          >
+            {staffList.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('audit_log')}
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'audit_log'
               ? 'border-[#F94001] text-[#F94001]'
               : 'border-transparent text-[#5F6368] hover:text-[#021526]'
           }`}
         >
           <ShieldCheck className="h-4 w-4" />
-          <span>System & Database Health</span>
+          <span>Audit Log</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('api')}
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
+            activeTab === 'api'
+              ? 'border-[#F94001] text-[#F94001]'
+              : 'border-transparent text-[#5F6368] hover:text-[#021526]'
+          }`}
+        >
+          <Key className="h-4 w-4" />
+          <span>API & Webhooks</span>
         </button>
       </div>
 
-      {/* TAB 1: STAFF MANAGEMENT */}
+      {/* TAB: ORGANIZATION PROFILE */}
+      {activeTab === 'organization' && (
+        <div className="bg-white rounded-3xl p-6 border border-[#E5E7EB] shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-4">
+            <div>
+              <h3 className="text-base font-bold text-[#021526] flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-[#F94001]" />
+                Organization & Legal Entity Profile
+              </h3>
+              <p className="text-xs text-[#5F6368] mt-0.5">
+                Official corporate details, registered address, tax identification, and customer contact endpoints.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => showToast('success', 'Profile Saved', 'Organization settings updated successfully.')}
+              className="inline-flex items-center gap-2 bg-[#F94001] hover:bg-[#d93600] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
+            >
+              <Save className="h-4 w-4" />
+              <span>Save Changes</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-700">Platform Brand Name</label>
+              <input
+                type="text"
+                value={orgForm.brand_name}
+                onChange={(e) => setOrgForm({ ...orgForm, brand_name: e.target.value })}
+                className="w-full bg-[#F8F9FA] border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs font-semibold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-700">Registered Legal Entity Name</label>
+              <input
+                type="text"
+                value={orgForm.legal_name}
+                onChange={(e) => setOrgForm({ ...orgForm, legal_name: e.target.value })}
+                className="w-full bg-[#F8F9FA] border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs font-semibold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-700">Corporate GSTIN</label>
+              <input
+                type="text"
+                value={orgForm.gstin}
+                onChange={(e) => setOrgForm({ ...orgForm, gstin: e.target.value })}
+                className="w-full bg-[#F8F9FA] border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-700">Company PAN</label>
+              <input
+                type="text"
+                value={orgForm.pan}
+                onChange={(e) => setOrgForm({ ...orgForm, pan: e.target.value })}
+                className="w-full bg-[#F8F9FA] border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold"
+              />
+            </div>
+
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="font-bold text-slate-700">Corporate Head Office Address</label>
+              <input
+                type="text"
+                value={orgForm.address}
+                onChange={(e) => setOrgForm({ ...orgForm, address: e.target.value })}
+                className="w-full bg-[#F8F9FA] border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs font-semibold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-700">Official Support Email</label>
+              <input
+                type="email"
+                value={orgForm.support_email}
+                onChange={(e) => setOrgForm({ ...orgForm, support_email: e.target.value })}
+                className="w-full bg-[#F8F9FA] border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs font-semibold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-700">Helpdesk Phone / WhatsApp</label>
+              <input
+                type="text"
+                value={orgForm.support_phone}
+                onChange={(e) => setOrgForm({ ...orgForm, support_phone: e.target.value })}
+                className="w-full bg-[#F8F9FA] border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-700">Default Currency</label>
+              <input
+                type="text"
+                value={orgForm.currency}
+                disabled
+                className="w-full bg-slate-100 border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-bold text-slate-700">Operating Timezone</label>
+              <input
+                type="text"
+                value={orgForm.timezone}
+                disabled
+                className="w-full bg-slate-100 border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-500"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: MODULE CONFIG */}
+      {activeTab === 'module_config' && (
+        <div className="bg-white rounded-3xl p-6 border border-[#E5E7EB] shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-4">
+            <div>
+              <h3 className="text-base font-bold text-[#021526] flex items-center gap-2">
+                <Sliders className="h-5 w-5 text-[#F94001]" />
+                Turf Operating Parameters & Feature Switches
+              </h3>
+              <p className="text-xs text-[#5F6368] mt-0.5">
+                Tune booking horizons, cancellation grace times, platform fee cuts, and instant confirmation policies.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => showToast('success', 'Config Saved', 'System operational parameters updated.')}
+              className="inline-flex items-center gap-2 bg-[#F94001] hover:bg-[#d93600] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
+            >
+              <Save className="h-4 w-4" />
+              <span>Apply Parameters</span>
+            </button>
+          </div>
+
+          <div className="space-y-4 text-xs">
+            {/* Toggles */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-sm text-[#021526]">Instant Booking Confirmation</p>
+                  <p className="text-[#5F6368] text-[11px] mt-0.5">
+                    Automatically confirm turf reservations without manual owner acceptance.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={moduleConfig.instant_booking}
+                  onChange={(e) => setModuleConfig({ ...moduleConfig, instant_booking: e.target.checked })}
+                  className="h-5 w-5 rounded text-[#F94001] focus:ring-[#F94001] cursor-pointer"
+                />
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-sm text-[#021526]">Dynamic Night Prime-Time Surge</p>
+                  <p className="text-[#5F6368] text-[11px] mt-0.5">
+                    Enable higher weekend and peak floodlit night slot rates.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={moduleConfig.dynamic_prime_surge}
+                  onChange={(e) => setModuleConfig({ ...moduleConfig, dynamic_prime_surge: e.target.checked })}
+                  className="h-5 w-5 rounded text-[#F94001] focus:ring-[#F94001] cursor-pointer"
+                />
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-sm text-[#021526]">Player OTP Check-in Verification</p>
+                  <p className="text-[#5F6368] text-[11px] mt-0.5">
+                    Require OTP verification at turf reception before ground floodlights turn on.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={moduleConfig.otp_booking_verification}
+                  onChange={(e) => setModuleConfig({ ...moduleConfig, otp_booking_verification: e.target.checked })}
+                  className="h-5 w-5 rounded text-[#F94001] focus:ring-[#F94001] cursor-pointer"
+                />
+              </div>
+
+              <div className="p-4 rounded-2xl bg-rose-50/60 border border-rose-200 flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-sm text-rose-900">Maintenance Blackout Mode</p>
+                  <p className="text-rose-700 text-[11px] mt-0.5">
+                    Temporarily pause public user bookings across all platforms for server upgrades.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={moduleConfig.maintenance_mode}
+                  onChange={(e) => setModuleConfig({ ...moduleConfig, maintenance_mode: e.target.checked })}
+                  className="h-5 w-5 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Numerical inputs */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3">
+              <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-1.5">
+                <label className="font-bold text-slate-700">Platform Commission %</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={moduleConfig.platform_fee_percent}
+                    onChange={(e) => setModuleConfig({ ...moduleConfig, platform_fee_percent: Number(e.target.value) })}
+                    className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3 py-2 text-sm font-bold font-mono"
+                  />
+                  <span className="font-bold text-slate-500">%</span>
+                </div>
+                <p className="text-[10px] text-slate-400">Default iBookSports platform revenue cut.</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-1.5">
+                <label className="font-bold text-slate-700">Max Advance Booking Horizon</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={moduleConfig.advance_booking_days}
+                    onChange={(e) => setModuleConfig({ ...moduleConfig, advance_booking_days: Number(e.target.value) })}
+                    className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3 py-2 text-sm font-bold font-mono"
+                  />
+                  <span className="font-bold text-slate-500">Days</span>
+                </div>
+                <p className="text-[10px] text-slate-400">How many days in advance players can reserve slots.</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-1.5">
+                <label className="font-bold text-slate-700">Cancellation Grace Window</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={moduleConfig.cancellation_grace_hours}
+                    onChange={(e) => setModuleConfig({ ...moduleConfig, cancellation_grace_hours: Number(e.target.value) })}
+                    className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3 py-2 text-sm font-bold font-mono"
+                  />
+                  <span className="font-bold text-slate-500">Hours</span>
+                </div>
+                <p className="text-[10px] text-slate-400">Free 100% refund window prior to slot start time.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: VENDOR APP CMS */}
+      {activeTab === 'vendor_cms' && (
+        <div className="bg-white rounded-3xl p-6 border border-[#E5E7EB] shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-4">
+            <div>
+              <h3 className="text-base font-bold text-[#021526] flex items-center gap-2">
+                <Smartphone className="h-5 w-5 text-[#F94001]" />
+                Vendor Partner App Content Management
+              </h3>
+              <p className="text-xs text-[#5F6368] mt-0.5">
+                Manage notices, promo banners, and legal terms displayed inside the iBookSports Partner Manager app.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => showToast('success', 'Vendor CMS Published', 'Partner app banners and guidelines updated.')}
+              className="inline-flex items-center gap-2 bg-[#F94001] hover:bg-[#d93600] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
+            >
+              <Save className="h-4 w-4" />
+              <span>Publish to Partner App</span>
+            </button>
+          </div>
+
+          <div className="space-y-4 text-xs">
+            <div className="p-4 rounded-2xl bg-[#FFF1EC] border border-[#F94001]/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-sm text-[#021526]">Partner Announcement Alert Banner</span>
+                <label className="flex items-center gap-2 text-[11px] font-bold text-slate-700 cursor-pointer">
+                  <span>Display on Partner Home</span>
+                  <input
+                    type="checkbox"
+                    checked={vendorCms.banner_active}
+                    onChange={(e) => setVendorCms({ ...vendorCms, banner_active: e.target.checked })}
+                    className="h-4 w-4 text-[#F94001] rounded"
+                  />
+                </label>
+              </div>
+              <input
+                type="text"
+                value={vendorCms.announcement_title}
+                onChange={(e) => setVendorCms({ ...vendorCms, announcement_title: e.target.value })}
+                placeholder="Banner Headline..."
+                className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3.5 py-2 text-xs font-bold"
+              />
+              <textarea
+                rows={2}
+                value={vendorCms.announcement_body}
+                onChange={(e) => setVendorCms({ ...vendorCms, announcement_body: e.target.value })}
+                placeholder="Announcement message..."
+                className="w-full bg-white border border-[#CBD5E1] rounded-xl p-3 text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+                <label className="font-bold text-slate-700 block">Current Partner Agreement Version</label>
+                <input
+                  type="text"
+                  value={vendorCms.partner_agreement_version}
+                  onChange={(e) => setVendorCms({ ...vendorCms, partner_agreement_version: e.target.value })}
+                  className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3.5 py-2 text-xs font-semibold"
+                />
+                <p className="text-[10px] text-slate-400">Version required for new venue partner e-signatures.</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+                <label className="font-bold text-slate-700 block">Payout Schedule Policy Note</label>
+                <input
+                  type="text"
+                  value={vendorCms.payout_schedule_note}
+                  onChange={(e) => setVendorCms({ ...vendorCms, payout_schedule_note: e.target.value })}
+                  className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3.5 py-2 text-xs font-semibold"
+                />
+                <p className="text-[10px] text-slate-400">Shown on the vendor banking settlement ledger.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: CUSTOMER SIDE CMS */}
+      {activeTab === 'customer_cms' && (
+        <div className="bg-white rounded-3xl p-6 border border-[#E5E7EB] shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-4">
+            <div>
+              <h3 className="text-base font-bold text-[#021526] flex items-center gap-2">
+                <Globe className="h-5 w-5 text-[#F94001]" />
+                Customer Mobile App & Web CMS
+              </h3>
+              <p className="text-xs text-[#5F6368] mt-0.5">
+                Control the hero marketing copy, marquee announcement ticker, and featured arena showcases.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => showToast('success', 'Customer CMS Published', 'Customer app content refreshed.')}
+              className="inline-flex items-center gap-2 bg-[#F94001] hover:bg-[#d93600] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
+            >
+              <Save className="h-4 w-4" />
+              <span>Publish Changes</span>
+            </button>
+          </div>
+
+          <div className="space-y-4 text-xs">
+            <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+              <label className="font-bold text-slate-700 block">Announcement Marquee Ticker (Top Bar)</label>
+              <input
+                type="text"
+                value={customerCms.promo_ticker}
+                onChange={(e) => setCustomerCms({ ...customerCms, promo_ticker: e.target.value })}
+                className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3.5 py-2 text-xs font-semibold"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+                <label className="font-bold text-slate-700 block">Hero Title</label>
+                <input
+                  type="text"
+                  value={customerCms.hero_title}
+                  onChange={(e) => setCustomerCms({ ...customerCms, hero_title: e.target.value })}
+                  className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3.5 py-2 text-xs font-bold"
+                />
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+                <label className="font-bold text-slate-700 block">Hero Subtitle</label>
+                <input
+                  type="text"
+                  value={customerCms.hero_subtitle}
+                  onChange={(e) => setCustomerCms({ ...customerCms, hero_subtitle: e.target.value })}
+                  className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3.5 py-2 text-xs font-semibold"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2">
+              <label className="font-bold text-slate-700 block">Featured Arenas on App Home</label>
+              <div className="space-y-1.5">
+                {customerCms.featured_turfs.map((turf, i) => (
+                  <div key={i} className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
+                    <span className="font-semibold text-slate-800">{turf}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                      Rank #{i + 1}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: AUDIT LOG */}
+      {activeTab === 'audit_log' && (
+        <div className="bg-white rounded-3xl p-6 border border-[#E5E7EB] shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
+            <div>
+              <h3 className="text-base font-bold text-[#021526] flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-[#F94001]" />
+                Security & Administrative Audit Trail
+              </h3>
+              <p className="text-xs text-[#5F6368] mt-0.5">
+                Immutable activity log recording admin actions, settlement payouts, and security events.
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border border-[#E5E7EB]">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#F8F9FA] text-[#5F6368] font-bold uppercase">
+                <tr>
+                  <th className="py-2.5 px-3">Timestamp</th>
+                  <th className="py-2.5 px-3">Admin Operator</th>
+                  <th className="py-2.5 px-3">Action</th>
+                  <th className="py-2.5 px-3">Module</th>
+                  <th className="py-2.5 px-3">Details</th>
+                  <th className="py-2.5 px-3">IP Address</th>
+                  <th className="py-2.5 px-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E5E7EB]">
+                {auditLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-[#F8F9FA]">
+                    <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">{log.timestamp}</td>
+                    <td className="py-2.5 px-3 font-semibold text-slate-800">{log.admin_user}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-[#F94001] text-[11px]">{log.action}</td>
+                    <td className="py-2.5 px-3 font-medium text-slate-700">{log.module}</td>
+                    <td className="py-2.5 px-3 max-w-xs text-slate-600 truncate">{log.details}</td>
+                    <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">{log.ip_address}</td>
+                    <td className="py-2.5 px-3">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        {log.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: API & WEBHOOKS */}
+      {activeTab === 'api' && (
+        <div className="bg-white rounded-3xl p-6 border border-[#E5E7EB] shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-4">
+            <div>
+              <h3 className="text-base font-bold text-[#021526] flex items-center gap-2">
+                <Key className="h-5 w-5 text-[#F94001]" />
+                API Credentials & Webhook Endpoints
+              </h3>
+              <p className="text-xs text-[#5F6368] mt-0.5">
+                Developer API keys, payment gateway webhooks, and third-party SMS/WhatsApp integration keys.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4 text-xs">
+            {/* Live API Keys */}
+            <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-3">
+              <span className="font-bold text-sm text-[#021526]">Production API Keys</span>
+              <div className="space-y-2 font-mono">
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase font-bold">Public Key (Client Side)</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <input
+                      type="text"
+                      value={apiKeyProd}
+                      readOnly
+                      className="flex-1 bg-white border border-[#CBD5E1] rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(apiKeyProd);
+                        setCopiedKey('key');
+                        setTimeout(() => setCopiedKey(null), 2000);
+                      }}
+                      className="px-3 py-2 rounded-xl bg-slate-800 text-white font-bold text-xs hover:bg-slate-700 cursor-pointer"
+                    >
+                      {copiedKey === 'key' ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase font-bold">Secret Key (Backend Server Only)</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <input
+                      type={showSecret ? 'text' : 'password'}
+                      value={apiSecretProd}
+                      readOnly
+                      className="flex-1 bg-white border border-[#CBD5E1] rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSecret(!showSecret)}
+                      className="px-3 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                    >
+                      {showSecret ? 'Hide' : 'Reveal'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Gateway Webhooks */}
+            <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-3">
+              <span className="font-bold text-sm text-[#021526]">Payment Gateway Webhooks</span>
+              <div className="space-y-2">
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase font-bold">Razorpay Webhook URL</span>
+                  <input
+                    type="text"
+                    value={razorpayWebhook}
+                    onChange={(e) => setRazorpayWebhook(e.target.value)}
+                    className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3 py-2 text-xs font-mono font-semibold mt-0.5"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase font-bold">Webhook Signature Secret</span>
+                  <input
+                    type="text"
+                    value={razorpaySecret}
+                    readOnly
+                    className="w-full bg-slate-100 border border-[#CBD5E1] rounded-xl px-3 py-2 text-xs font-mono text-slate-600 mt-0.5"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* WhatsApp Integration Status */}
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+              <div>
+                <span className="font-bold text-sm text-emerald-950">WhatsApp Cloud API Dispatcher</span>
+                <p className="text-[11px] text-emerald-800 mt-0.5">
+                  Sends instant booking confirmation slips & OTPs via WhatsApp Business API (+91 94888 12345).
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-emerald-600 text-white font-bold text-xs">
+                Connected
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: STAFF MANAGEMENT */}
       {activeTab === 'staff' && (
         <div className="space-y-6">
           {/* STATS OVERVIEW */}
@@ -1233,115 +1919,7 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
-      {/* TAB 3: SUPPORT CHANNELS */}
-      {activeTab === 'support' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="rounded-2xl bg-white p-6 border border-[#E5E7EB] shadow-xs space-y-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-[#021526]">
-              <LifeBuoy className="h-4 w-4 text-[#F94001]" />
-              <span>Official Partner Help Desk</span>
-            </div>
 
-            <div className="space-y-3 text-xs text-[#021526]">
-              <div className="p-3.5 rounded-xl bg-[#FFF1EC] border border-[#F94001]/20 space-y-1.5">
-                <span className="font-bold text-[#F94001]">Dedicated Partner Support</span>
-                <p className="text-[#5F6368] text-[11px]">
-                  Support Email: <strong className="text-[#021526]">partners@ibooksports.com</strong>
-                </p>
-                <p className="text-[#5F6368] text-[11px]">
-                  WhatsApp Support Line: <strong className="text-[#021526]">+91 98765 43210</strong>
-                </p>
-                <p className="text-[#5F6368] text-[11px]">
-                  Operating Hours: <strong className="text-[#021526]">Mon - Sun: 06:00 AM - 11:00 PM IST</strong>
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-1">
-                <span className="font-bold text-[#021526]">Escalation Level</span>
-                <p className="text-[#5F6368] text-[11px]">
-                  Priority Support Level: <strong className="text-[#F94001]">Tier 1 — Direct Response</strong>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl bg-white p-6 border border-[#E5E7EB] shadow-xs space-y-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-[#021526]">
-              <Users className="h-4 w-4 text-[#F94001]" />
-              <span>Support Ticket Assignments</span>
-            </div>
-
-            <p className="text-xs text-[#5F6368]">
-              All partner helpdesk queries and phone support calls are routed to active staff members with the{' '}
-              <strong className="text-[#021526]">SUPPORT_AGENT</strong> role.
-            </p>
-
-            <div className="p-3.5 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2 text-xs">
-              <span className="font-bold text-[#021526]">Active Support Staff On Duty:</span>
-              <div className="space-y-1.5">
-                {staffList
-                  .filter((s) => s.role === 'SUPPORT_AGENT' && s.status === 'ACTIVE')
-                  .map((s) => (
-                    <div key={s.id} className="flex items-center justify-between text-[11px]">
-                      <span className="font-semibold text-[#021526]">{s.name}</span>
-                      <span className="font-mono text-[#5F6368]">+91 {s.phone_number}</span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: SYSTEM HEALTH */}
-      {activeTab === 'system' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="rounded-2xl bg-white p-6 border border-[#E5E7EB] shadow-xs space-y-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-[#021526]">
-              <ShieldCheck className="h-4 w-4 text-[#F94001]" />
-              <span>Backend & Database Status</span>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-1">
-                <span className="font-bold text-[#021526]">Target Database</span>
-                <p className="text-[#5F6368] text-[11px]">
-                  Database: <strong className="text-[#021526]">PostgreSQL (Port 5432)</strong>
-                </p>
-                <p className="text-[#5F6368] text-[11px]">
-                  Connection Status: <strong className="text-emerald-700">Healthy & Online</strong>
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-1">
-                <span className="font-bold text-[#021526]">API Documentation</span>
-                <p className="text-[#5F6368] text-[11px]">
-                  Swagger UI Docs: <a href="http://localhost:4000/api/v1/docs" target="_blank" rel="noreferrer" className="text-[#F94001] font-bold hover:underline">Open Swagger UI &rarr;</a>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl bg-white p-6 border border-[#E5E7EB] shadow-xs space-y-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-[#021526]">
-              <Settings className="h-4 w-4 text-[#F94001]" />
-              <span>Security & Roles Summary</span>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              {roles.map((r) => (
-                <div key={r.key} className="p-2.5 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB]">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-[#021526]">{r.title}</span>
-                    <span className="text-[10px] font-mono text-[#5F6368]">{r.key}</span>
-                  </div>
-                  <p className="text-[#5F6368] text-[11px] mt-0.5">{r.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* CREATE STAFF MODAL */}
       {mounted && isCreateModalOpen && typeof document !== 'undefined' && createPortal(
