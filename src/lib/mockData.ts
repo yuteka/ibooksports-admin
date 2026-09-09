@@ -131,7 +131,8 @@ export interface CustomerItem {
   status: 'ACTIVE' | 'SUSPENDED';
   total_bookings: number;
   total_spent: number;
-  wallet_balance: number;
+  total_hours_spent: number;
+  wallet_balance?: number;
   preferred_sports: string[];
   favorite_venues: string[];
   cancellation_count: number;
@@ -1293,8 +1294,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     tier: 'PLATINUM',
     status: 'ACTIVE',
     total_bookings: 28,
+    total_hours_spent: 36,
     total_spent: 42500,
-    wallet_balance: 1450,
     preferred_sports: ['Football', 'Badminton'],
     favorite_venues: ['Green Field Sports Park', 'Sky Sports Arena'],
     cancellation_count: 1,
@@ -1322,8 +1323,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     tier: 'GOLD',
     status: 'ACTIVE',
     total_bookings: 19,
+    total_hours_spent: 26,
     total_spent: 26800,
-    wallet_balance: 500,
     preferred_sports: ['Box Cricket', 'Football'],
     favorite_venues: ['Sky Sports Arena & Box Turf'],
     cancellation_count: 0,
@@ -1351,8 +1352,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     tier: 'GOLD',
     status: 'ACTIVE',
     total_bookings: 14,
+    total_hours_spent: 18,
     total_spent: 18900,
-    wallet_balance: 800,
     preferred_sports: ['Badminton', 'Pickleball'],
     favorite_venues: ['Apex Arena & Sports Club'],
     cancellation_count: 2,
@@ -1380,8 +1381,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     tier: 'SILVER',
     status: 'ACTIVE',
     total_bookings: 8,
+    total_hours_spent: 10,
     total_spent: 9800,
-    wallet_balance: 0,
     preferred_sports: ['Football'],
     favorite_venues: ['Sky Sports Arena & Box Turf'],
     cancellation_count: 0,
@@ -1409,8 +1410,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     tier: 'PLATINUM',
     status: 'ACTIVE',
     total_bookings: 34,
+    total_hours_spent: 48,
     total_spent: 51200,
-    wallet_balance: 2300,
     preferred_sports: ['Tennis', 'Box Cricket'],
     favorite_venues: ['Apex Arena & Sports Club'],
     cancellation_count: 1,
@@ -1438,8 +1439,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     tier: 'REGULAR',
     status: 'ACTIVE',
     total_bookings: 4,
+    total_hours_spent: 5,
     total_spent: 3600,
-    wallet_balance: 200,
     preferred_sports: ['Badminton'],
     favorite_venues: ['Green Field Sports Park'],
     cancellation_count: 0,
@@ -1467,8 +1468,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     tier: 'PLATINUM',
     status: 'ACTIVE',
     total_bookings: 22,
+    total_hours_spent: 30,
     total_spent: 33000,
-    wallet_balance: 1200,
     preferred_sports: ['Football', 'Badminton'],
     favorite_venues: ['Kochi United Turf & Arena'],
     cancellation_count: 1,
@@ -1496,8 +1497,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     tier: 'GOLD',
     status: 'ACTIVE',
     total_bookings: 17,
+    total_hours_spent: 24,
     total_spent: 22100,
-    wallet_balance: 750,
     preferred_sports: ['Box Cricket', 'Pickleball'],
     favorite_venues: ['Hyderabad Smashers & Turf Hub'],
     cancellation_count: 0,
@@ -1525,8 +1526,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     tier: 'PLATINUM',
     status: 'ACTIVE',
     total_bookings: 31,
+    total_hours_spent: 44,
     total_spent: 58900,
-    wallet_balance: 3400,
     preferred_sports: ['Football', 'Tennis'],
     favorite_venues: ['Mumbai Champions Turf & Arena'],
     cancellation_count: 2,
@@ -1707,8 +1708,8 @@ export const INITIAL_BOOKINGS: BookingItem[] = [
     venue_share: 585,
     payment_status: 'PAID',
     booking_status: 'COMPLETED',
-    payment_method: 'WALLET',
-    transaction_id: 'pay_wlt_981241088',
+    payment_method: 'UPI',
+    transaction_id: 'pay_rzp_981241088',
     created_at: '2026-03-08T12:00:00Z',
   },
   {
@@ -2279,7 +2280,7 @@ export const INITIAL_AUDIT_LOGS = [
 
 export interface CourtExtensionHistory {
   round: number;
-  action: 'SUBMITTED' | 'RESUBMITTED' | 'APPROVED' | 'REJECTED';
+  action: 'NEW_REQUEST' | 'SUBMITTED' | 'RESUBMITTED' | 'APPROVED' | 'REJECTED';
   timestamp: string;
   notes?: string;
   note?: string;
@@ -2327,7 +2328,7 @@ export interface CourtExtensionRequest {
   refund_percentage: number;
 
   // Review & Lifecycle State
-  status: 'SUBMITTED' | 'RESUBMITTED' | 'APPROVED' | 'REJECTED';
+  status: 'NEW_REQUEST' | 'SUBMITTED' | 'RESUBMITTED' | 'APPROVED' | 'REJECTED';
   submission_count: number;
   submission_round?: number;
   rejection_reason?: string;
@@ -2371,7 +2372,7 @@ export const INITIAL_COURT_REQUESTS: CourtExtensionRequest[] = [
     history: [
       {
         round: 1,
-        action: 'SUBMITTED',
+        action: 'NEW_REQUEST',
         timestamp: '2026-03-06 14:20:00',
         notes: 'Initial court addition request submitted by venue owner.',
       },
@@ -2415,12 +2416,12 @@ export const INITIAL_COURT_REQUESTS: CourtExtensionRequest[] = [
     peak_days: ['Sat', 'Sun'],
     cancellation_window_hours: 12,
     refund_percentage: 100,
-    status: 'SUBMITTED',
+    status: 'NEW_REQUEST',
     submission_count: 1,
     history: [
       {
         round: 1,
-        action: 'SUBMITTED',
+        action: 'NEW_REQUEST',
         timestamp: '2026-03-09 09:15:00',
         notes: 'New physical shared pitch request for weekend box cricket.',
       },
