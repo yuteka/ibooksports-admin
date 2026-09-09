@@ -15,13 +15,23 @@ export interface VenueDetail {
   sports: string;
   sports_list: string[];
   courts: number;
-  status: 'ACTIVE' | 'PENDING' | 'MAINTENANCE';
+  status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'MAINTENANCE';
   rating: number;
   total_reviews: number;
   opening_time: string;
   closing_time: string;
-  created_at: string;
+  created_at?: string;
   
+  // Staff & Management Contact Details
+  staff_name?: string;
+  staff_contact?: string;
+  staff_role?: string;
+
+  // Today's Live Performance Metrics
+  today_bookings_count?: number;
+  today_booking_revenue?: number;
+  today_slot_occupancy_percent?: number;
+
   // Owner & KYC Details
   owner: {
     full_name: string;
@@ -54,13 +64,33 @@ export interface VenueDetail {
   court_list: {
     id: string;
     name: string;
+    display_name?: string;
     sport: string;
     surface: string; // e.g. 'FIFA Pro 50mm Astroturf', 'BWF Synthetic Mat'
     court_type: 'OUTDOOR' | 'INDOOR' | 'COVERED ROOF';
+    environment?: 'OUTDOOR' | 'INDOOR' | 'COVERED ROOF';
     dimensions: string;
     lighting: string; // e.g. '400 Lux Commercial LED'
     base_hourly_rate: number;
-    status: 'ACTIVE' | 'MAINTENANCE';
+    regular_price?: number;
+    peak_price?: number;
+    peak_days?: string[];
+    min_booking_time_mins?: number;
+    operating_hours?: string;
+    cancellation_policy_hours?: number;
+    refund_percentage?: number;
+    status: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE';
+  }[];
+
+  // Staff Directory
+  staff_list?: {
+    id: string;
+    name: string;
+    mobile_number: string;
+    role: string;
+    email: string;
+    shift_hours: string;
+    status: 'ACTIVE' | 'INACTIVE';
   }[];
 
   // Slots
@@ -83,6 +113,9 @@ export interface VenueDetail {
     unsettled_balance: number;
     total_settled: number;
   };
+
+  // Amenities
+  amenities: string[];
 }
 
 export interface CustomerItem {
@@ -91,6 +124,8 @@ export interface CustomerItem {
   phone: string;
   email: string;
   city: string;
+  district?: string;
+  state?: string;
   registered_at: string;
   tier: 'PLATINUM' | 'GOLD' | 'SILVER' | 'REGULAR';
   status: 'ACTIVE' | 'SUSPENDED';
@@ -100,6 +135,17 @@ export interface CustomerItem {
   preferred_sports: string[];
   favorite_venues: string[];
   cancellation_count: number;
+  recent_booking?: {
+    booking_code: string;
+    venue_name: string;
+    court_name: string;
+    sport: string;
+    booking_date: string;
+    time_slot: string;
+    total_amount: number;
+    booking_status: 'CONFIRMED' | 'IN_PLAY' | 'COMPLETED' | 'CANCELLED';
+    payment_status: 'PAID' | 'REFUNDED' | 'FAILED';
+  };
 }
 
 export interface BookingItem {
@@ -124,6 +170,11 @@ export interface BookingItem {
   payment_method: 'UPI' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'NET_BANKING' | 'WALLET';
   transaction_id: string;
   created_at: string;
+  cancellation_reason?: string;
+  cancelled_at?: string;
+  refund_amount?: number;
+  refund_status?: 'REFUNDED' | 'PROCESSING' | 'WALLET_CREDITED' | 'NOT_APPLICABLE';
+  refund_utr?: string;
 }
 
 export interface PaymentTransactionItem {
@@ -221,6 +272,12 @@ export const INITIAL_VENUES: VenueDetail[] = [
     opening_time: '05:00 AM',
     closing_time: '11:30 PM',
     created_at: '2025-01-15T10:00:00Z',
+    staff_name: 'Suresh Kumar',
+    staff_contact: '+91 94432 11220',
+    staff_role: 'Operations & Turf Manager',
+    today_bookings_count: 14,
+    today_booking_revenue: 18200,
+    today_slot_occupancy_percent: 88,
     owner: {
       full_name: 'Karthik Rajan',
       phone: '+91 98765 43210',
@@ -308,6 +365,18 @@ export const INITIAL_VENUES: VenueDetail[] = [
       unsettled_balance: 42500,
       total_settled: 303100,
     },
+    amenities: [
+      'Free Parking (50 Cars)',
+      'Changing Rooms (M/F)',
+      'Hot Showers',
+      'Drinking Water Station',
+      'Sports Café & Snack Bar',
+      'First Aid Kit',
+      'CCTV Surveillance',
+      'Wi-Fi (Free)',
+      'Equipment Rental',
+      'Floodlights',
+    ],
   },
   {
     id: 'ven_1002',
@@ -330,6 +399,12 @@ export const INITIAL_VENUES: VenueDetail[] = [
     opening_time: '05:30 AM',
     closing_time: '12:00 AM',
     created_at: '2025-02-01T08:30:00Z',
+    staff_name: 'Ramesh Sundaram',
+    staff_contact: '+91 98410 88771',
+    staff_role: 'Operations Lead & Duty Incharge',
+    today_bookings_count: 22,
+    today_booking_revenue: 28600,
+    today_slot_occupancy_percent: 92,
     owner: {
       full_name: 'Vignesh Sundaram',
       phone: '+91 98451 23456',
@@ -439,6 +514,20 @@ export const INITIAL_VENUES: VenueDetail[] = [
       unsettled_balance: 78200,
       total_settled: 472600,
     },
+    amenities: [
+      'Covered Parking (80 Cars)',
+      'AC Changing Rooms (M/F)',
+      'Hot & Cold Showers',
+      'RO Drinking Water',
+      'Sports Lounge & Café',
+      'Physiotherapy Room',
+      'CCTV Surveillance',
+      'Wi-Fi (Free)',
+      'Racket & Shoe Rental',
+      'Pro Shop',
+      'Floodlights',
+      'Air-Conditioned Courts',
+    ],
   },
   {
     id: 'ven_1003',
@@ -461,6 +550,12 @@ export const INITIAL_VENUES: VenueDetail[] = [
     opening_time: '06:00 AM',
     closing_time: '11:00 PM',
     created_at: '2025-02-10T11:15:00Z',
+    staff_name: 'Deepak Gowda',
+    staff_contact: '+91 99801 33442',
+    staff_role: 'Duty Manager & Senior Coach',
+    today_bookings_count: 16,
+    today_booking_revenue: 21800,
+    today_slot_occupancy_percent: 84,
     owner: {
       full_name: 'Ananya Sharma',
       phone: '+91 97112 23344',
@@ -537,6 +632,651 @@ export const INITIAL_VENUES: VenueDetail[] = [
       unsettled_balance: 31000,
       total_settled: 347000,
     },
+    amenities: [
+      'Rooftop Open Air Setting',
+      'Valet Parking',
+      'Changing Rooms',
+      'Showers',
+      'Hydration Station',
+      'Sky Lounge & Bar',
+      'CCTV Surveillance',
+      'Wi-Fi (Free)',
+      'Equipment Rental',
+      'Floodlights',
+    ],
+  },
+  {
+    id: 'ven_1004',
+    venue_name: 'Kochi United Turf & Arena',
+    tagline: 'Kochi Premier FIFA Certified 7v7 Football Turf & Badminton Hub',
+    name: 'Fahad Aliyar',
+    mobile_number: 9745122334,
+    email: 'fahad@kochiunitedturf.in',
+    venue_location_name: 'https://www.google.com/maps?q=10.0159,76.3419',
+    address: 'Near Infopark Expressway, Kakkanad, Kochi',
+    district: 'Ernakulam',
+    state: 'Kerala',
+    pincode: '682030',
+    sports: 'FOOTBALL, BADMINTON',
+    sports_list: ['Football', 'Badminton'],
+    courts: 4,
+    status: 'ACTIVE',
+    rating: 4.9,
+    total_reviews: 418,
+    opening_time: '05:00 AM',
+    closing_time: '12:00 AM',
+    created_at: '2025-02-15T09:00:00Z',
+    staff_name: 'Praveen Nair',
+    staff_contact: '+91 98470 55432',
+    staff_role: 'Arena Operations Incharge',
+    today_bookings_count: 14,
+    today_booking_revenue: 17800,
+    today_slot_occupancy_percent: 82,
+    owner: {
+      full_name: 'Fahad Aliyar',
+      phone: '+91 97451 22334',
+      email: 'fahad@kochiunitedturf.in',
+      pan_number: 'KLMNA5432B',
+      pan_status: 'VERIFIED',
+      aadhaar_masked: 'XXXX-XXXX-6612',
+      aadhaar_status: 'VERIFIED',
+      gstin: '32AAAFK5432M1Z2',
+      gstin_status: 'ACTIVE',
+      registered_address: 'Door 12/445, Seaport-Airport Road, Kakkanad, Kochi 682030',
+      kyc_verified_date: '2025-02-18',
+    },
+    bank: {
+      account_holder_name: 'Kochi United Arena LLP',
+      bank_name: 'Federal Bank Ltd',
+      account_number_masked: '•••• •••• 8821',
+      ifsc_code: 'FDRL0001342',
+      branch_name: 'Kakkanad Branch, Kochi',
+      upi_id: 'kochiunited@federal',
+      verification_status: 'VERIFIED',
+      penny_drop_status: 'SUCCESS',
+      last_payout_date: '2026-03-05',
+    },
+    court_list: [
+      {
+        id: 'crt_401',
+        name: 'Malabar Turf 7v7',
+        sport: 'Football',
+        surface: 'FIFA Pro 50mm Astroturf',
+        court_type: 'OUTDOOR',
+        dimensions: '115ft x 65ft',
+        lighting: '450 Lux LED Floodlights',
+        base_hourly_rate: 1500,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_402',
+        name: 'Thunder Turf 5v5',
+        sport: 'Football',
+        surface: '45mm Monofilament Turf',
+        court_type: 'OUTDOOR',
+        dimensions: '80ft x 45ft',
+        lighting: '350 Lux Floodlights',
+        base_hourly_rate: 1100,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_403',
+        name: 'Badminton Court 1',
+        sport: 'Badminton',
+        surface: 'BWF Grade 1 Synthetic Vinyl Mat',
+        court_type: 'INDOOR',
+        dimensions: '44ft x 20ft',
+        lighting: '500 Lux Anti-Glare LED',
+        base_hourly_rate: 450,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_404',
+        name: 'Badminton Court 2',
+        sport: 'Badminton',
+        surface: 'BWF Grade 1 Synthetic Vinyl Mat',
+        court_type: 'INDOOR',
+        dimensions: '44ft x 20ft',
+        lighting: '500 Lux Anti-Glare LED',
+        base_hourly_rate: 450,
+        status: 'ACTIVE',
+      },
+    ],
+    slot_rules: {
+      slot_duration_minutes: 60,
+      peak_morning_hours: '05:30 AM - 09:00 AM',
+      peak_morning_price: 1300,
+      regular_day_hours: '09:00 AM - 05:00 PM',
+      regular_day_price: 1000,
+      prime_night_hours: '05:00 PM - 12:00 AM',
+      prime_night_price: 1600,
+      weekend_surge_percent: 20,
+      instant_booking_enabled: true,
+    },
+    financials: {
+      gross_volume: 345000,
+      platform_commission: 34500,
+      unsettled_balance: 38200,
+      total_settled: 272300,
+    },
+    amenities: [
+      'Covered Parking',
+      'Air-Conditioned Lounge',
+      'Showers & Lockers',
+      'Purified Water Station',
+      'Juice Bar & Café',
+      'Floodlights',
+      'Equipment Rental',
+      'Wi-Fi (Free)',
+    ],
+  },
+  {
+    id: 'ven_1005',
+    venue_name: 'Hyderabad Smashers & Turf Hub',
+    tagline: 'High-Tech Floodlit Box Cricket, Badminton & Pickleball Center',
+    name: 'Venkat Rao',
+    mobile_number: 9123456789,
+    email: 'venkat@smashershub.com',
+    venue_location_name: 'https://www.google.com/maps?q=17.4401,78.3489',
+    address: 'Financial District, Behind Waverock SEZ, Gachibowli',
+    district: 'Hyderabad',
+    state: 'Telangana',
+    pincode: '500032',
+    sports: 'CRICKET, BADMINTON, PICKLEBALL',
+    sports_list: ['Box Cricket', 'Badminton', 'Pickleball'],
+    courts: 5,
+    status: 'ACTIVE',
+    rating: 4.8,
+    total_reviews: 388,
+    opening_time: '05:00 AM',
+    closing_time: '01:00 AM',
+    created_at: '2025-02-20T10:30:00Z',
+    staff_name: 'Kiran Reddy',
+    staff_contact: '+91 90001 77654',
+    staff_role: 'Senior Turf Supervisor',
+    today_bookings_count: 20,
+    today_booking_revenue: 26400,
+    today_slot_occupancy_percent: 91,
+    owner: {
+      full_name: 'Venkat Rao',
+      phone: '+91 91234 56789',
+      email: 'venkat@smashershub.com',
+      pan_number: 'TYUIO9876Q',
+      pan_status: 'VERIFIED',
+      aadhaar_masked: 'XXXX-XXXX-7723',
+      aadhaar_status: 'VERIFIED',
+      gstin: '36AAAPV8912T1Z6',
+      gstin_status: 'ACTIVE',
+      registered_address: 'Plot 45, Nanakramguda, Financial District, Hyderabad 500032',
+      kyc_verified_date: '2025-02-22',
+    },
+    bank: {
+      account_holder_name: 'Smashers Sports Hub Private Limited',
+      bank_name: 'State Bank of India',
+      account_number_masked: '•••• •••• 9934',
+      ifsc_code: 'SBIN0011663',
+      branch_name: 'Gachibowli Branch, Hyderabad',
+      upi_id: 'smashershub@sbi',
+      verification_status: 'VERIFIED',
+      penny_drop_status: 'SUCCESS',
+      last_payout_date: '2026-03-06',
+    },
+    court_list: [
+      {
+        id: 'crt_501',
+        name: 'Gachibowli Box Pitch 1',
+        sport: 'Box Cricket',
+        surface: 'Professional ShockPad Turf with Ceiling Net',
+        court_type: 'COVERED ROOF',
+        dimensions: '90ft x 45ft',
+        lighting: '450 Lux LED',
+        base_hourly_rate: 1300,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_502',
+        name: 'Gachibowli Box Pitch 2',
+        sport: 'Box Cricket',
+        surface: 'Professional ShockPad Turf with Ceiling Net',
+        court_type: 'COVERED ROOF',
+        dimensions: '90ft x 45ft',
+        lighting: '450 Lux LED',
+        base_hourly_rate: 1300,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_503',
+        name: 'Badminton Arena A',
+        sport: 'Badminton',
+        surface: 'BWF Certified 5mm Mat',
+        court_type: 'INDOOR',
+        dimensions: '44ft x 20ft',
+        lighting: '500 Lux Anti-Glare',
+        base_hourly_rate: 550,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_504',
+        name: 'Badminton Arena B',
+        sport: 'Badminton',
+        surface: 'BWF Certified 5mm Mat',
+        court_type: 'INDOOR',
+        dimensions: '44ft x 20ft',
+        lighting: '500 Lux Anti-Glare',
+        base_hourly_rate: 550,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_505',
+        name: 'Pickleball Court Pro',
+        sport: 'Pickleball',
+        surface: 'USAPA Cushioned Acrylic Court',
+        court_type: 'COVERED ROOF',
+        dimensions: '44ft x 20ft',
+        lighting: '400 Lux Commercial LED',
+        base_hourly_rate: 650,
+        status: 'ACTIVE',
+      },
+    ],
+    slot_rules: {
+      slot_duration_minutes: 60,
+      peak_morning_hours: '06:00 AM - 09:30 AM',
+      peak_morning_price: 1400,
+      regular_day_hours: '09:30 AM - 05:00 PM',
+      regular_day_price: 1100,
+      prime_night_hours: '05:00 PM - 01:00 AM',
+      prime_night_price: 1700,
+      weekend_surge_percent: 25,
+      instant_booking_enabled: true,
+    },
+    financials: {
+      gross_volume: 520000,
+      platform_commission: 52000,
+      unsettled_balance: 62000,
+      total_settled: 406000,
+    },
+    amenities: [
+      'Valet Parking (100 Cars)',
+      'AC Lounge with Live Streaming',
+      'Separate Changing Rooms & Showers',
+      'Sports Energy Bar',
+      'RO Drinking Water',
+      'Pro Racket Stringing & Shop',
+      'CCTV & Security',
+    ],
+  },
+  {
+    id: 'ven_1006',
+    venue_name: 'Mumbai Champions Turf & Arena',
+    tagline: 'Andheri Flagship Rooftop Multi-Sport Turf & Tennis Arena',
+    name: 'Rohit Sawant',
+    mobile_number: 9819988776,
+    email: 'rohit@mumbaichampionsturf.com',
+    venue_location_name: 'https://www.google.com/maps?q=19.1363,72.8277',
+    address: 'New Link Road, Adjacent to Infinity Mall, Andheri West',
+    district: 'Mumbai Suburban',
+    state: 'Maharashtra',
+    pincode: '400053',
+    sports: 'FOOTBALL, CRICKET, TENNIS',
+    sports_list: ['Football', 'Box Cricket', 'Tennis'],
+    courts: 4,
+    status: 'MAINTENANCE',
+    rating: 4.9,
+    total_reviews: 620,
+    opening_time: '06:00 AM',
+    closing_time: '01:30 AM',
+    created_at: '2025-01-20T12:00:00Z',
+    staff_name: 'Amol Deshmukh',
+    staff_contact: '+91 98200 44556',
+    staff_role: 'Operations Head & Turf Manager',
+    today_bookings_count: 18,
+    today_booking_revenue: 27900,
+    today_slot_occupancy_percent: 94,
+    owner: {
+      full_name: 'Rohit Sawant',
+      phone: '+91 98199 88776',
+      email: 'rohit@mumbaichampionsturf.com',
+      pan_number: 'ZXCVB1234N',
+      pan_status: 'VERIFIED',
+      aadhaar_masked: 'XXXX-XXXX-2244',
+      aadhaar_status: 'VERIFIED',
+      gstin: '27AAACR7891P1Z8',
+      gstin_status: 'ACTIVE',
+      registered_address: 'Suite 401, Crystal Plaza, New Link Road, Andheri West, Mumbai 400053',
+      kyc_verified_date: '2025-01-25',
+    },
+    bank: {
+      account_holder_name: 'Champions Turf Mumbai Private Limited',
+      bank_name: 'Kotak Mahindra Bank',
+      account_number_masked: '•••• •••• 5519',
+      ifsc_code: 'KKBK0000654',
+      branch_name: 'Andheri West Branch, Mumbai',
+      upi_id: 'championsturf@kotak',
+      verification_status: 'VERIFIED',
+      penny_drop_status: 'SUCCESS',
+      last_payout_date: '2026-03-05',
+    },
+    court_list: [
+      {
+        id: 'crt_601',
+        name: 'Wembley Turf 7v7',
+        sport: 'Football',
+        surface: 'FIFA Pro Monofilament 55mm Turf',
+        court_type: 'OUTDOOR',
+        dimensions: '110ft x 65ft',
+        lighting: '500 Lux Arena Floodlights',
+        base_hourly_rate: 1900,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_602',
+        name: 'Maracana Turf 5v5',
+        sport: 'Football',
+        surface: 'High Density 40mm Astroturf',
+        court_type: 'OUTDOOR',
+        dimensions: '80ft x 45ft',
+        lighting: '400 Lux Floodlights',
+        base_hourly_rate: 1300,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_603',
+        name: 'Wankhede Box Cricket Pitch',
+        sport: 'Box Cricket',
+        surface: 'Cushioned ShockPad Turf with Full Net Enclosure',
+        court_type: 'COVERED ROOF',
+        dimensions: '90ft x 45ft',
+        lighting: '450 Lux LED',
+        base_hourly_rate: 1400,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_604',
+        name: 'Wimbledon Hardcourt Tennis',
+        sport: 'Tennis',
+        surface: 'ITF Level 3 Acrylic Cushion Hardcourt',
+        court_type: 'OUTDOOR',
+        dimensions: '78ft x 36ft',
+        lighting: '500 Lux Commercial Stadium Grade',
+        base_hourly_rate: 950,
+        status: 'ACTIVE',
+      },
+    ],
+    slot_rules: {
+      slot_duration_minutes: 60,
+      peak_morning_hours: '06:00 AM - 09:30 AM',
+      peak_morning_price: 1600,
+      regular_day_hours: '09:30 AM - 05:00 PM',
+      regular_day_price: 1200,
+      prime_night_hours: '05:00 PM - 01:30 AM',
+      prime_night_price: 2100,
+      weekend_surge_percent: 25,
+      instant_booking_enabled: true,
+    },
+    financials: {
+      gross_volume: 780000,
+      platform_commission: 78000,
+      unsettled_balance: 94000,
+      total_settled: 608000,
+    },
+    amenities: [
+      'Rooftop Panoramic View',
+      'Valet Parking Service',
+      'Air-Conditioned Locker Rooms & Showers',
+      'Live Match Screening Lounge',
+      'Hydration & Juice Bar',
+      'Equipment & Sneaker Rental',
+      'Floodlights',
+      'Wi-Fi (Free)',
+    ],
+  },
+  {
+    id: 'ven_1007',
+    venue_name: 'Madurai Royal Sports Turf',
+    tagline: 'South Tamil Nadu Premier 7v7 Football & Cricket Ground',
+    name: 'Saravanan Muthu',
+    mobile_number: 9842165432,
+    email: 'saravanan@madurairoyalturf.in',
+    venue_location_name: 'https://www.google.com/maps?q=9.9252,78.1198',
+    address: '80 Feet Road, Near Mattuthavani Bus Terminus, KK Nagar',
+    district: 'Madurai',
+    state: 'Tamil Nadu',
+    pincode: '625020',
+    sports: 'FOOTBALL, CRICKET',
+    sports_list: ['Football', 'Box Cricket'],
+    courts: 3,
+    status: 'INACTIVE',
+    rating: 4.7,
+    total_reviews: 245,
+    opening_time: '05:30 AM',
+    closing_time: '11:00 PM',
+    created_at: '2025-02-25T11:00:00Z',
+    staff_name: 'Muthuvel P',
+    staff_contact: '+91 94860 12345',
+    staff_role: 'Operations & Duty Incharge',
+    today_bookings_count: 10,
+    today_booking_revenue: 12200,
+    today_slot_occupancy_percent: 76,
+    owner: {
+      full_name: 'Saravanan Muthu',
+      phone: '+91 98421 65432',
+      email: 'saravanan@madurairoyalturf.in',
+      pan_number: 'QWERT6789Y',
+      pan_status: 'VERIFIED',
+      aadhaar_masked: 'XXXX-XXXX-5511',
+      aadhaar_status: 'VERIFIED',
+      gstin: '33AABCM9012N1Z4',
+      gstin_status: 'ACTIVE',
+      registered_address: '42, KK Nagar West Cross, Madurai 625020',
+      kyc_verified_date: '2025-02-28',
+    },
+    bank: {
+      account_holder_name: 'Royal Sports Madurai LLP',
+      bank_name: 'Canara Bank',
+      account_number_masked: '•••• •••• 3341',
+      ifsc_code: 'CNRB0001890',
+      branch_name: 'KK Nagar Branch, Madurai',
+      upi_id: 'royalturf@canara',
+      verification_status: 'VERIFIED',
+      penny_drop_status: 'SUCCESS',
+      last_payout_date: '2026-03-04',
+    },
+    court_list: [
+      {
+        id: 'crt_701',
+        name: 'Meenakshi Arena 7v7',
+        sport: 'Football',
+        surface: 'FIFA Standard 50mm Astroturf',
+        court_type: 'OUTDOOR',
+        dimensions: '105ft x 60ft',
+        lighting: '400 Lux Floodlights',
+        base_hourly_rate: 1200,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_702',
+        name: 'Pandya Pitch (Box Cricket)',
+        sport: 'Box Cricket',
+        surface: 'Enclosed Nylon Turf with Full Netting',
+        court_type: 'COVERED ROOF',
+        dimensions: '85ft x 45ft',
+        lighting: '350 Lux LED',
+        base_hourly_rate: 1000,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_703',
+        name: 'Sprint Turf 5v5',
+        sport: 'Football',
+        surface: '40mm High Durability Turf',
+        court_type: 'OUTDOOR',
+        dimensions: '75ft x 42ft',
+        lighting: '350 Lux LED',
+        base_hourly_rate: 900,
+        status: 'ACTIVE',
+      },
+    ],
+    slot_rules: {
+      slot_duration_minutes: 60,
+      peak_morning_hours: '05:30 AM - 09:00 AM',
+      peak_morning_price: 1100,
+      regular_day_hours: '09:00 AM - 05:00 PM',
+      regular_day_price: 900,
+      prime_night_hours: '05:00 PM - 11:00 PM',
+      prime_night_price: 1400,
+      weekend_surge_percent: 15,
+      instant_booking_enabled: true,
+    },
+    financials: {
+      gross_volume: 240000,
+      platform_commission: 24000,
+      unsettled_balance: 28500,
+      total_settled: 187500,
+    },
+    amenities: [
+      'Two-Wheeler & Car Parking',
+      'Changing Rooms',
+      'Showers',
+      'Cold Drinking Water',
+      'Floodlights',
+      'Equipment Rental',
+    ],
+  },
+  {
+    id: 'ven_1008',
+    venue_name: 'Capital Sports Village & Arena',
+    tagline: 'NCR Flagship Floodlit Tennis, Football & Basketball Complex',
+    name: 'Vikramaditya Oberoi',
+    mobile_number: 9910088990,
+    email: 'vikram@capitalsportsvillage.com',
+    venue_location_name: 'https://www.google.com/maps?q=28.4595,77.0266',
+    address: 'Golf Course Extension Road, Sector 62, Gurugram',
+    district: 'Gurugram',
+    state: 'Delhi NCR',
+    pincode: '122005',
+    sports: 'TENNIS, FOOTBALL, BASKETBALL',
+    sports_list: ['Tennis', 'Football', 'Basketball'],
+    courts: 5,
+    status: 'ACTIVE',
+    rating: 4.9,
+    total_reviews: 495,
+    opening_time: '05:00 AM',
+    closing_time: '12:00 AM',
+    created_at: '2025-01-10T08:00:00Z',
+    staff_name: 'Harpreet Singh',
+    staff_contact: '+91 98110 34567',
+    staff_role: 'Operations & Sports Director',
+    today_bookings_count: 17,
+    today_booking_revenue: 24200,
+    today_slot_occupancy_percent: 87,
+    owner: {
+      full_name: 'Vikramaditya Oberoi',
+      phone: '+91 99100 88990',
+      email: 'vikram@capitalsportsvillage.com',
+      pan_number: 'POIUY5432L',
+      pan_status: 'VERIFIED',
+      aadhaar_masked: 'XXXX-XXXX-8899',
+      aadhaar_status: 'VERIFIED',
+      gstin: '06AAACV1234K1Z9',
+      gstin_status: 'ACTIVE',
+      registered_address: 'Estate House 12, Golf Course Ext Road, Sector 62, Gurugram 122005',
+      kyc_verified_date: '2025-01-15',
+    },
+    bank: {
+      account_holder_name: 'Capital Sports Village India Private Limited',
+      bank_name: 'Standard Chartered Bank',
+      account_number_masked: '•••• •••• 7120',
+      ifsc_code: 'SCBL0036001',
+      branch_name: 'DLF Cyber City Branch, Gurugram',
+      upi_id: 'capitalsports@scb',
+      verification_status: 'VERIFIED',
+      penny_drop_status: 'SUCCESS',
+      last_payout_date: '2026-03-05',
+    },
+    court_list: [
+      {
+        id: 'crt_801',
+        name: 'Centre Court Tennis 1',
+        sport: 'Tennis',
+        surface: 'ITF Level 4 Grand Slam Cushion Acrylic',
+        court_type: 'OUTDOOR',
+        dimensions: '78ft x 36ft',
+        lighting: '600 Lux Tournament Grade LED',
+        base_hourly_rate: 1100,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_802',
+        name: 'Court Tennis 2',
+        sport: 'Tennis',
+        surface: 'ITF Level 4 Grand Slam Cushion Acrylic',
+        court_type: 'OUTDOOR',
+        dimensions: '78ft x 36ft',
+        lighting: '500 Lux Tournament Grade LED',
+        base_hourly_rate: 1000,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_803',
+        name: 'Capital 7v7 Astroturf',
+        sport: 'Football',
+        surface: 'FIFA Quality Pro 50mm Infill Turf',
+        court_type: 'OUTDOOR',
+        dimensions: '110ft x 65ft',
+        lighting: '450 Lux LED Floodlights',
+        base_hourly_rate: 1800,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_804',
+        name: 'Arena Basketball Court',
+        sport: 'Basketball',
+        surface: 'FIBA Approved Cushioned Polyurethane Surface',
+        court_type: 'COVERED ROOF',
+        dimensions: '94ft x 50ft',
+        lighting: '500 Lux LED',
+        base_hourly_rate: 900,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'crt_805',
+        name: 'Mini Turf 5v5',
+        sport: 'Football',
+        surface: '40mm Monofilament Turf',
+        court_type: 'OUTDOOR',
+        dimensions: '80ft x 45ft',
+        lighting: '350 Lux Floodlights',
+        base_hourly_rate: 1200,
+        status: 'ACTIVE',
+      },
+    ],
+    slot_rules: {
+      slot_duration_minutes: 60,
+      peak_morning_hours: '06:00 AM - 09:30 AM',
+      peak_morning_price: 1500,
+      regular_day_hours: '09:30 AM - 05:00 PM',
+      regular_day_price: 1100,
+      prime_night_hours: '05:00 PM - 12:00 AM',
+      prime_night_price: 1900,
+      weekend_surge_percent: 20,
+      instant_booking_enabled: true,
+    },
+    financials: {
+      gross_volume: 640000,
+      platform_commission: 64000,
+      unsettled_balance: 71000,
+      total_settled: 505000,
+    },
+    amenities: [
+      'Valet & Covered Parking (120 Cars)',
+      'Clubhouse & Sports Café',
+      'Luxury Locker Rooms & Showers',
+      'Physiotherapy & Recovery Zone',
+      'Floodlit Courts',
+      'Pro Equipment Store',
+      'High-Speed Wi-Fi',
+      '24/7 Security & CCTV',
+    ],
   },
 ];
 
@@ -547,6 +1287,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     phone: '+91 98401 23456',
     email: 'rahul.krishnan@gmail.com',
     city: 'Chennai',
+    district: 'Chennai',
+    state: 'Tamil Nadu',
     registered_at: '2025-03-12',
     tier: 'PLATINUM',
     status: 'ACTIVE',
@@ -556,6 +1298,17 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     preferred_sports: ['Football', 'Badminton'],
     favorite_venues: ['Green Field Sports Park', 'Sky Sports Arena'],
     cancellation_count: 1,
+    recent_booking: {
+      booking_code: 'IBS-2603-9001',
+      venue_name: 'Sky Sports Arena & Box Turf',
+      court_name: 'Turf A (Camp Nou 7v7)',
+      sport: 'Football',
+      booking_date: '2026-03-08',
+      time_slot: '07:00 PM - 08:00 PM',
+      total_amount: 1600,
+      booking_status: 'IN_PLAY',
+      payment_status: 'PAID',
+    },
   },
   {
     id: 'cust_502',
@@ -563,6 +1316,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     phone: '+91 97910 87654',
     email: 'dk.sportsfan@yahoo.com',
     city: 'Coimbatore',
+    district: 'Coimbatore',
+    state: 'Tamil Nadu',
     registered_at: '2025-04-05',
     tier: 'GOLD',
     status: 'ACTIVE',
@@ -572,6 +1327,17 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     preferred_sports: ['Box Cricket', 'Football'],
     favorite_venues: ['Sky Sports Arena & Box Turf'],
     cancellation_count: 0,
+    recent_booking: {
+      booking_code: 'IBS-2603-9002',
+      venue_name: 'Sky Sports Arena & Box Turf',
+      court_name: 'Pitch C (Thunder Box Cricket)',
+      sport: 'Box Cricket',
+      booking_date: '2026-03-08',
+      time_slot: '08:00 PM - 10:00 PM',
+      total_amount: 2800,
+      booking_status: 'CONFIRMED',
+      payment_status: 'PAID',
+    },
   },
   {
     id: 'cust_503',
@@ -579,6 +1345,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     phone: '+91 98845 11223',
     email: 'pooja.sundaram@techcorp.in',
     city: 'Bengaluru',
+    district: 'Bengaluru Urban',
+    state: 'Karnataka',
     registered_at: '2025-05-19',
     tier: 'GOLD',
     status: 'ACTIVE',
@@ -588,6 +1356,17 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     preferred_sports: ['Badminton', 'Pickleball'],
     favorite_venues: ['Apex Arena & Sports Club'],
     cancellation_count: 2,
+    recent_booking: {
+      booking_code: 'IBS-2603-9003',
+      venue_name: 'Green Field Sports Park',
+      court_name: 'Badminton Court 1',
+      sport: 'Badminton',
+      booking_date: '2026-03-08',
+      time_slot: '06:00 PM - 07:00 PM',
+      total_amount: 500,
+      booking_status: 'COMPLETED',
+      payment_status: 'PAID',
+    },
   },
   {
     id: 'cust_504',
@@ -595,6 +1374,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     phone: '+91 94432 99881',
     email: 'senthil.k@autotech.co',
     city: 'Coimbatore',
+    district: 'Coimbatore',
+    state: 'Tamil Nadu',
     registered_at: '2025-06-01',
     tier: 'SILVER',
     status: 'ACTIVE',
@@ -604,6 +1385,17 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     preferred_sports: ['Football'],
     favorite_venues: ['Sky Sports Arena & Box Turf'],
     cancellation_count: 0,
+    recent_booking: {
+      booking_code: 'IBS-2603-9005',
+      venue_name: 'Sky Sports Arena & Box Turf',
+      court_name: 'Turf B (Bernabeu 5v5)',
+      sport: 'Football',
+      booking_date: '2026-03-07',
+      time_slot: '07:00 PM - 08:00 PM',
+      total_amount: 1100,
+      booking_status: 'COMPLETED',
+      payment_status: 'PAID',
+    },
   },
   {
     id: 'cust_505',
@@ -611,6 +1403,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     phone: '+91 99001 54321',
     email: 'arjun.nambiar@startup.io',
     city: 'Bengaluru',
+    district: 'Bengaluru Urban',
+    state: 'Karnataka',
     registered_at: '2025-07-22',
     tier: 'PLATINUM',
     status: 'ACTIVE',
@@ -620,6 +1414,17 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     preferred_sports: ['Tennis', 'Box Cricket'],
     favorite_venues: ['Apex Arena & Sports Club'],
     cancellation_count: 1,
+    recent_booking: {
+      booking_code: 'IBS-2603-9004',
+      venue_name: 'Apex Arena & Sports Club',
+      court_name: 'Pitch 1 (Rooftop Box Cricket Arena)',
+      sport: 'Box Cricket',
+      booking_date: '2026-03-09',
+      time_slot: '06:00 AM - 08:00 AM',
+      total_amount: 2400,
+      booking_status: 'CONFIRMED',
+      payment_status: 'PAID',
+    },
   },
   {
     id: 'cust_506',
@@ -627,6 +1432,8 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     phone: '+91 98411 77665',
     email: 'kavitha.r@outlook.com',
     city: 'Chennai',
+    district: 'Chennai',
+    state: 'Tamil Nadu',
     registered_at: '2025-08-14',
     tier: 'REGULAR',
     status: 'ACTIVE',
@@ -636,6 +1443,104 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
     preferred_sports: ['Badminton'],
     favorite_venues: ['Green Field Sports Park'],
     cancellation_count: 0,
+    recent_booking: {
+      booking_code: 'IBS-2603-9007',
+      venue_name: 'Green Field Sports Park',
+      court_name: 'Pickleball Pro Court A',
+      sport: 'Pickleball',
+      booking_date: '2026-03-08',
+      time_slot: '05:00 PM - 06:00 PM',
+      total_amount: 650,
+      booking_status: 'COMPLETED',
+      payment_status: 'PAID',
+    },
+  },
+  {
+    id: 'cust_507',
+    name: 'Nikhil Mathew',
+    phone: '+91 98471 66778',
+    email: 'nikhil.mathew@keralafc.com',
+    city: 'Kochi',
+    district: 'Ernakulam',
+    state: 'Kerala',
+    registered_at: '2025-09-02',
+    tier: 'PLATINUM',
+    status: 'ACTIVE',
+    total_bookings: 22,
+    total_spent: 33000,
+    wallet_balance: 1200,
+    preferred_sports: ['Football', 'Badminton'],
+    favorite_venues: ['Kochi United Turf & Arena'],
+    cancellation_count: 1,
+    recent_booking: {
+      booking_code: 'IBS-2603-9008',
+      venue_name: 'Kochi United Turf & Arena',
+      court_name: 'Malabar Turf 7v7',
+      sport: 'Football',
+      booking_date: '2026-03-08',
+      time_slot: '06:00 PM - 07:00 PM',
+      total_amount: 1500,
+      booking_status: 'IN_PLAY',
+      payment_status: 'PAID',
+    },
+  },
+  {
+    id: 'cust_508',
+    name: 'Rohit Varma',
+    phone: '+91 90002 88991',
+    email: 'rohit.varma@techie.org',
+    city: 'Hyderabad',
+    district: 'Hyderabad',
+    state: 'Telangana',
+    registered_at: '2025-10-18',
+    tier: 'GOLD',
+    status: 'ACTIVE',
+    total_bookings: 17,
+    total_spent: 22100,
+    wallet_balance: 750,
+    preferred_sports: ['Box Cricket', 'Pickleball'],
+    favorite_venues: ['Hyderabad Smashers & Turf Hub'],
+    cancellation_count: 0,
+    recent_booking: {
+      booking_code: 'IBS-2603-9009',
+      venue_name: 'Hyderabad Smashers & Turf Hub',
+      court_name: 'Gachibowli Box Pitch 1',
+      sport: 'Box Cricket',
+      booking_date: '2026-03-09',
+      time_slot: '07:00 PM - 09:00 PM',
+      total_amount: 2600,
+      booking_status: 'CONFIRMED',
+      payment_status: 'PAID',
+    },
+  },
+  {
+    id: 'cust_509',
+    name: 'Sameer Merchant',
+    phone: '+91 98201 55667',
+    email: 'sameer.m@fintechmumbai.com',
+    city: 'Mumbai',
+    district: 'Mumbai Suburban',
+    state: 'Maharashtra',
+    registered_at: '2025-11-05',
+    tier: 'PLATINUM',
+    status: 'ACTIVE',
+    total_bookings: 31,
+    total_spent: 58900,
+    wallet_balance: 3400,
+    preferred_sports: ['Football', 'Tennis'],
+    favorite_venues: ['Mumbai Champions Turf & Arena'],
+    cancellation_count: 2,
+    recent_booking: {
+      booking_code: 'IBS-2603-9010',
+      venue_name: 'Mumbai Champions Turf & Arena',
+      court_name: 'Wembley Turf 7v7',
+      sport: 'Football',
+      booking_date: '2026-03-08',
+      time_slot: '09:00 PM - 10:00 PM',
+      total_amount: 1900,
+      booking_status: 'CONFIRMED',
+      payment_status: 'PAID',
+    },
   },
 ];
 
@@ -777,6 +1682,11 @@ export const INITIAL_BOOKINGS: BookingItem[] = [
     payment_method: 'UPI',
     transaction_id: 'pay_rzp_981240672',
     created_at: '2026-03-05T16:30:00Z',
+    cancellation_reason: 'Player personal conflict / schedule clash',
+    cancelled_at: '2026-03-05 18:45:10',
+    refund_amount: 1900,
+    refund_status: 'REFUNDED',
+    refund_utr: 'UTR-RZP-992140182',
   },
   {
     id: 'bkg_9007',
@@ -800,6 +1710,131 @@ export const INITIAL_BOOKINGS: BookingItem[] = [
     payment_method: 'WALLET',
     transaction_id: 'pay_wlt_981241088',
     created_at: '2026-03-08T12:00:00Z',
+  },
+  {
+    id: 'bkg_9008',
+    booking_code: 'IBS-2603-9008',
+    customer_id: 'cust_507',
+    customer_name: 'Nikhil Mathew',
+    customer_phone: '+91 98471 66778',
+    venue_id: 'ven_1004',
+    venue_name: 'Kochi United Turf & Arena',
+    court_id: 'crt_401',
+    court_name: 'Malabar Turf 7v7',
+    sport: 'Football',
+    booking_date: '2026-03-08',
+    time_slot: '06:00 PM - 07:00 PM',
+    duration_minutes: 60,
+    total_amount: 1500,
+    platform_fee: 150,
+    venue_share: 1350,
+    payment_status: 'PAID',
+    booking_status: 'IN_PLAY',
+    payment_method: 'UPI',
+    transaction_id: 'pay_rzp_981241102',
+    created_at: '2026-03-08T10:00:00Z',
+  },
+  {
+    id: 'bkg_9009',
+    booking_code: 'IBS-2603-9009',
+    customer_id: 'cust_508',
+    customer_name: 'Rohit Varma',
+    customer_phone: '+91 90002 88991',
+    venue_id: 'ven_1005',
+    venue_name: 'Hyderabad Smashers & Turf Hub',
+    court_id: 'crt_501',
+    court_name: 'Gachibowli Box Pitch 1',
+    sport: 'Box Cricket',
+    booking_date: '2026-03-09',
+    time_slot: '07:00 PM - 09:00 PM',
+    duration_minutes: 120,
+    total_amount: 2600,
+    platform_fee: 260,
+    venue_share: 2340,
+    payment_status: 'PAID',
+    booking_status: 'CONFIRMED',
+    payment_method: 'UPI',
+    transaction_id: 'pay_rzp_981241123',
+    created_at: '2026-03-08T11:15:00Z',
+  },
+  {
+    id: 'bkg_9010',
+    booking_code: 'IBS-2603-9010',
+    customer_id: 'cust_509',
+    customer_name: 'Sameer Merchant',
+    customer_phone: '+91 98201 55667',
+    venue_id: 'ven_1006',
+    venue_name: 'Mumbai Champions Turf & Arena',
+    court_id: 'crt_601',
+    court_name: 'Wembley Turf 7v7',
+    sport: 'Football',
+    booking_date: '2026-03-08',
+    time_slot: '09:00 PM - 10:00 PM',
+    duration_minutes: 60,
+    total_amount: 1900,
+    platform_fee: 190,
+    venue_share: 1710,
+    payment_status: 'PAID',
+    booking_status: 'CONFIRMED',
+    payment_method: 'CREDIT_CARD',
+    transaction_id: 'pay_rzp_981241154',
+    created_at: '2026-03-08T13:30:00Z',
+  },
+  {
+    id: 'bkg_9011',
+    booking_code: 'IBS-2603-9011',
+    customer_id: 'cust_503',
+    customer_name: 'Pooja Sundaram',
+    customer_phone: '+91 98845 11223',
+    venue_id: 'ven_1003',
+    venue_name: 'Apex Arena & Sports Club',
+    court_id: 'crt_302',
+    court_name: 'Turf 2 (Skyline 5v5 Football)',
+    sport: 'Football',
+    booking_date: '2026-03-04',
+    time_slot: '06:00 PM - 07:00 PM',
+    duration_minutes: 60,
+    total_amount: 1200,
+    platform_fee: 120,
+    venue_share: 1080,
+    payment_status: 'REFUNDED',
+    booking_status: 'CANCELLED',
+    payment_method: 'UPI',
+    transaction_id: 'pay_rzp_981240411',
+    created_at: '2026-03-03T15:00:00Z',
+    cancellation_reason: 'Rainfall / outdoor wet turf cancellation',
+    cancelled_at: '2026-03-04 16:30:00',
+    refund_amount: 1200,
+    refund_status: 'WALLET_CREDITED',
+    refund_utr: 'WLT-REF-20260304-89',
+  },
+  {
+    id: 'bkg_9012',
+    booking_code: 'IBS-2603-9012',
+    customer_id: 'cust_509',
+    customer_name: 'Sameer Merchant',
+    customer_phone: '+91 98201 55667',
+    venue_id: 'ven_1006',
+    venue_name: 'Mumbai Champions Turf & Arena',
+    court_id: 'crt_604',
+    court_name: 'Wimbledon Hardcourt Tennis',
+    sport: 'Tennis',
+    booking_date: '2026-03-02',
+    time_slot: '07:00 AM - 08:00 AM',
+    duration_minutes: 60,
+    total_amount: 950,
+    platform_fee: 95,
+    venue_share: 855,
+    payment_status: 'REFUNDED',
+    booking_status: 'CANCELLED',
+    payment_method: 'CREDIT_CARD',
+    transaction_id: 'pay_rzp_981240219',
+    created_at: '2026-03-01T20:10:00Z',
+    cancellation_reason: 'Customer requested cancellation 24h prior',
+    cancelled_at: '2026-03-01 22:15:00',
+    refund_amount: 950,
+    refund_status: 'REFUNDED',
+    refund_utr: 'UTR-HDFC-991204812',
   },
 ];
 
@@ -1239,5 +2274,244 @@ export const INITIAL_AUDIT_LOGS = [
     ip_address: '103.212.144.18',
     details: 'Admin session authorized via 6-digit email OTP verification',
     status: 'SUCCESS',
+  },
+];
+
+export interface CourtExtensionHistory {
+  round: number;
+  action: 'SUBMITTED' | 'RESUBMITTED' | 'APPROVED' | 'REJECTED';
+  timestamp: string;
+  notes?: string;
+  note?: string;
+  reviewer?: string;
+  actor_role?: string;
+  rejection_reason_code?: string;
+}
+
+export interface CourtExtensionRequest {
+  id: string;
+  venue_id: string;
+  venue_name: string;
+  venue_city: string;
+  owner_name: string;
+  owner_phone: string;
+
+  // Section 1: Same physical sports for this turf?
+  same_physical_sports: boolean;
+  parent_court_name?: string;
+
+  // Section 2: Court Information
+  sport: string;
+  court_name: string;
+  display_name: string;
+
+  // Section 3: Base Duration & Rate
+  min_booking_duration: string;
+  min_booking_duration_label?: string;
+  min_booking_duration_mins?: number;
+  price_per_hour: number;
+  regular_price?: number;
+
+  // Section 4: Peak Surcharge & Weekend Rates
+  peak_hours_start: string;
+  peak_hours_end: string;
+  peak_price: number;
+  weekend_price: number;
+  peak_days: string[];
+
+  // Section 5: Free Cancellation Window
+  cancellation_window_hours: number;
+  cancellation_policy_hours?: number;
+
+  // Section 6: Refund Payout Percentage
+  refund_percentage: number;
+
+  // Review & Lifecycle State
+  status: 'SUBMITTED' | 'RESUBMITTED' | 'APPROVED' | 'REJECTED';
+  submission_count: number;
+  submission_round?: number;
+  rejection_reason?: string;
+  rejection_notes?: string;
+  rejection_note?: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  submitted_at?: string;
+  environment?: 'Outdoor' | 'Indoor' | 'Covered Roof';
+  history: CourtExtensionHistory[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const INITIAL_COURT_REQUESTS: CourtExtensionRequest[] = [
+  {
+    id: 'CRQ-2603-101',
+    venue_id: 'ven_1001',
+    venue_name: 'skywalk sports',
+    venue_city: 'Coimbatore, Tamil Nadu',
+    owner_name: 'Shruthi jayamadhu',
+    owner_phone: '+91 6369591821',
+    same_physical_sports: false,
+    sport: 'Football',
+    court_name: 'Turf 1A (5-a-side)',
+    display_name: 'Main Arena Pitch 1 (Floodlit Turf)',
+    min_booking_duration: '1 Hour',
+    price_per_hour: 1000,
+    peak_hours_start: '06:00 PM',
+    peak_hours_end: '11:00 PM',
+    peak_price: 1400,
+    weekend_price: 1500,
+    peak_days: ['Fri', 'Sat', 'Sun'],
+    cancellation_window_hours: 12,
+    refund_percentage: 100,
+    status: 'RESUBMITTED',
+    submission_count: 2,
+    rejection_reason: 'PRICING_OUT_OF_BOUNDS',
+    rejection_notes:
+      'Weekend rate was set at ₹2,400 which violates the regional cap of ₹1,800. Please adjust weekend pricing and ensure min booking time is set to 1 hour.',
+    history: [
+      {
+        round: 1,
+        action: 'SUBMITTED',
+        timestamp: '2026-03-06 14:20:00',
+        notes: 'Initial court addition request submitted by venue owner.',
+      },
+      {
+        round: 1,
+        action: 'REJECTED',
+        timestamp: '2026-03-07 10:15:00',
+        reviewer: 'Admin Operations',
+        notes:
+          'Weekend rate was set at ₹2,400 which violates the regional cap of ₹1,800. Please adjust weekend pricing and ensure min booking time is set to 1 hour.',
+      },
+      {
+        round: 2,
+        action: 'RESUBMITTED',
+        timestamp: '2026-03-08 11:30:00',
+        notes:
+          'Adjusted weekend rate to ₹1,500 and verified 1-hour minimum booking duration as requested.',
+      },
+    ],
+    created_at: '2026-03-06 14:20:00',
+    updated_at: '2026-03-08 11:30:00',
+  },
+  {
+    id: 'CRQ-2603-102',
+    venue_id: 'ven_1002',
+    venue_name: 'Green Field Sports Park',
+    venue_city: 'Kochi, Kerala',
+    owner_name: 'Rahul Varma',
+    owner_phone: '+91 98470 12345',
+    same_physical_sports: true,
+    parent_court_name: 'Main Football Turf',
+    sport: 'Box Cricket',
+    court_name: 'Pitch B (Cricket Box)',
+    display_name: 'Floodlit Box Cricket Pitch 2',
+    min_booking_duration: '1 Hour',
+    price_per_hour: 1200,
+    peak_hours_start: '06:00 PM',
+    peak_hours_end: '10:00 PM',
+    peak_price: 1600,
+    weekend_price: 1800,
+    peak_days: ['Sat', 'Sun'],
+    cancellation_window_hours: 12,
+    refund_percentage: 100,
+    status: 'SUBMITTED',
+    submission_count: 1,
+    history: [
+      {
+        round: 1,
+        action: 'SUBMITTED',
+        timestamp: '2026-03-09 09:15:00',
+        notes: 'New physical shared pitch request for weekend box cricket.',
+      },
+    ],
+    created_at: '2026-03-09 09:15:00',
+    updated_at: '2026-03-09 09:15:00',
+  },
+  {
+    id: 'CRQ-2603-103',
+    venue_id: 'ven_1003',
+    venue_name: 'Metro Arena',
+    venue_city: 'Bengaluru, Karnataka',
+    owner_name: 'Anand Kumar',
+    owner_phone: '+91 94432 99881',
+    same_physical_sports: false,
+    sport: 'Badminton',
+    court_name: 'Court 3 (BWF Synthetic)',
+    display_name: 'BWF Wooden Floor Court 3',
+    min_booking_duration: '30 Mins',
+    price_per_hour: 700,
+    peak_hours_start: '05:00 PM',
+    peak_hours_end: '09:00 PM',
+    peak_price: 950,
+    weekend_price: 900,
+    peak_days: ['Sat', 'Sun'],
+    cancellation_window_hours: 4,
+    refund_percentage: 75,
+    status: 'REJECTED',
+    submission_count: 1,
+    rejection_reason: 'SURFACE_VERIFICATION_NEEDED',
+    rejection_notes:
+      'BWF mat thickness certification and clear floodlight lux test report missing. Please re-upload verified technical specs.',
+    history: [
+      {
+        round: 1,
+        action: 'SUBMITTED',
+        timestamp: '2026-03-05 16:40:00',
+        notes: 'Indoor badminton expansion.',
+      },
+      {
+        round: 1,
+        action: 'REJECTED',
+        timestamp: '2026-03-06 12:10:00',
+        reviewer: 'Admin Compliance',
+        notes:
+          'BWF mat thickness certification and clear floodlight lux test report missing. Please re-upload verified technical specs.',
+      },
+    ],
+    created_at: '2026-03-05 16:40:00',
+    updated_at: '2026-03-06 12:10:00',
+  },
+  {
+    id: 'CRQ-2603-104',
+    venue_id: 'ven_1001',
+    venue_name: 'skywalk sports',
+    venue_city: 'Coimbatore, Tamil Nadu',
+    owner_name: 'Shruthi jayamadhu',
+    owner_phone: '+91 6369591821',
+    same_physical_sports: false,
+    sport: 'Pickleball',
+    court_name: 'Pickleball Pro Court 1',
+    display_name: 'Tournament Grade Pickleball Court A',
+    min_booking_duration: '1 Hour',
+    price_per_hour: 800,
+    peak_hours_start: '06:00 PM',
+    peak_hours_end: '10:00 PM',
+    peak_price: 1100,
+    weekend_price: 1000,
+    peak_days: ['Sat', 'Sun'],
+    cancellation_window_hours: 12,
+    refund_percentage: 100,
+    status: 'APPROVED',
+    submission_count: 1,
+    reviewed_by: 'Super Admin',
+    reviewed_at: '2026-03-08 10:15:30',
+    history: [
+      {
+        round: 1,
+        action: 'SUBMITTED',
+        timestamp: '2026-03-07 14:00:00',
+        notes: 'Dedicated pickleball court.',
+      },
+      {
+        round: 1,
+        action: 'APPROVED',
+        timestamp: '2026-03-08 10:15:30',
+        reviewer: 'Super Admin',
+        notes: 'Specs verified against tournament standards. Activated.',
+      },
+    ],
+    created_at: '2026-03-07 14:00:00',
+    updated_at: '2026-03-08 10:15:30',
   },
 ];

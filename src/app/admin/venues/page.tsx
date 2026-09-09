@@ -1,54 +1,65 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Building2,
   Search,
   ExternalLink,
-  ShieldCheck,
   Eye,
   X,
   User,
-  CreditCard,
   Trophy,
-  Clock,
   CalendarCheck,
-  Landmark,
   CheckCircle2,
-  AlertCircle,
   MapPin,
   Phone,
   Mail,
-  FileText,
-  Percent,
-  Sparkles,
   DollarSign,
-  ChevronRight,
-  Filter,
+  ArrowUpDown,
+  Copy,
+  Check,
+  Landmark,
+  Activity,
+  AlertCircle,
+  Power,
+  Wrench,
+  ChevronDown,
 } from 'lucide-react';
 import {
   INITIAL_VENUES,
   INITIAL_BOOKINGS,
-  INITIAL_PAYMENTS,
-  INITIAL_SETTLEMENTS,
   VenueDetail,
 } from '@/lib/mockData';
-
-type VenueInspectionTab =
-  | 'information'
-  | 'bookings'
-  | 'payments'
-  | 'settlements';
 
 export default function VenuesManagementPage() {
   const [venues, setVenues] = useState<VenueDetail[]>(INITIAL_VENUES);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sportFilter, setSportFilter] = useState('ALL');
-  const [selectedVenue, setSelectedVenue] = useState<VenueDetail | null>(null);
-  const [activeTab, setActiveTab] = useState<VenueInspectionTab>('information');
+  const [selectedState, setSelectedState] = useState('ALL');
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [selectedSport, setSelectedSport] = useState('ALL');
+  const [sortBy, setSortBy] = useState<'bookings' | 'revenue' | 'courts' | 'name' | 'id'>('bookings');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [statusNotification, setStatusNotification] = useState<string | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<'state' | 'status' | 'sport' | 'sort' | null>(null);
+  const [rowStatusMenuVenueId, setRowStatusMenuVenueId] = useState<string | null>(null);
 
-  // Load converted live venues from localStorage
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-dropdown-container]')) {
+        setOpenDropdown(null);
+      }
+      if (!target.closest('[data-status-menu-container]')) {
+        setRowStatusMenuVenueId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Load converted live venues from localStorage if available
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -66,648 +77,967 @@ export default function VenuesManagementPage() {
     }
   }, []);
 
-  const filteredVenues = venues.filter((v) => {
-    const query = searchQuery.toLowerCase();
-    const matchesQuery =
-      v.venue_name.toLowerCase().includes(query) ||
-      v.name.toLowerCase().includes(query) ||
-      v.district.toLowerCase().includes(query) ||
-      v.state.toLowerCase().includes(query);
+  // Copy helper
+  const handleCopy = (text: string, id: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
+  };
 
-    const matchesSport =
-      sportFilter === 'ALL' ||
-      v.sports.toLowerCase().includes(sportFilter.toLowerCase());
+  // Toggle venue status (Active <-> Inactive <-> Maintenance)
+  const handleUpdateVenueStatus = (venueId: string, newStatus: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE') => {
+    setVenues((prev) => {
+      const updated = prev.map((v) => (v.id === venueId ? { ...v, status: newStatus } : v));
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('ibooksports_live_venues', JSON.stringify(updated));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      return updated;
+    });
 
-    return matchesQuery && matchesSport;
-  });
+    const label = newStatus === 'ACTIVE' ? 'Active' : newStatus === 'INACTIVE' ? 'Inactive' : 'Maintenance';
+    setStatusNotification(`Venue status successfully updated to "${label}"`);
+    setTimeout(() => setStatusNotification(null), 3500);
+  };
 
-  const venueBookings = selectedVenue
-    ? INITIAL_BOOKINGS.filter((b) => b.venue_id === selectedVenue.id)
-    : [];
+  // Extract all unique states with venue counts
+  const stateCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    venues.forEach((v) => {
+      const st = v.state || 'Other';
+      counts[st] = (counts[st] || 0) + 1;
+    });
+    return counts;
+  }, [venues]);
 
-  const venuePayments = selectedVenue
-    ? INITIAL_PAYMENTS.filter((p) => p.venue_name.includes(selectedVenue.venue_name.split(' ')[0]))
-    : [];
+  const uniqueStates = useMemo(() => {
+    return Object.keys(stateCounts).sort();
+  }, [stateCounts]);
 
-  const venueSettlements = selectedVenue
-    ? INITIAL_SETTLEMENTS.filter((s) => s.venue_id === selectedVenue.id)
-    : [];
+  // Extract status counts
+  const statusCounts = useMemo(() => {
+    const counts = { ACTIVE: 0, INACTIVE: 0, MAINTENANCE: 0, ALL: venues.length };
+    venues.forEach((v) => {
+      if (v.status === 'INACTIVE') counts.INACTIVE += 1;
+      else if (v.status === 'MAINTENANCE') counts.MAINTENANCE += 1;
+      else counts.ACTIVE += 1;
+    });
+    return counts;
+  }, [venues]);
+
+  // Extract unique sports
+  const uniqueSports = useMemo(() => {
+    const sportsSet = new Set<string>();
+    venues.forEach((v) => {
+      if (v.sports_list && Array.isArray(v.sports_list)) {
+        v.sports_list.forEach((s) => sportsSet.add(s.trim()));
+      } else if (v.sports) {
+        v.sports.split(',').forEach((s) => sportsSet.add(s.trim()));
+      }
+    });
+    return Array.from(sportsSet).sort();
+  }, [venues]);
+
+  // Filter and Sort venues
+  const filteredVenues = useMemo(() => {
+    return venues
+      .filter((v) => {
+        const query = searchQuery.toLowerCase().trim();
+        const formattedId = v.id.startsWith('ven_') ? `VEN-${v.id.replace('ven_', '')}` : v.id;
+        
+        const matchesQuery =
+          !query ||
+          v.venue_name.toLowerCase().includes(query) ||
+          formattedId.toLowerCase().includes(query) ||
+          v.id.toLowerCase().includes(query) ||
+          v.address.toLowerCase().includes(query) ||
+          v.district.toLowerCase().includes(query) ||
+          v.state.toLowerCase().includes(query) ||
+          v.name.toLowerCase().includes(query) ||
+          String(v.mobile_number).includes(query) ||
+          (v.staff_name && v.staff_name.toLowerCase().includes(query)) ||
+          (v.staff_contact && v.staff_contact.includes(query));
+
+        const matchesState = selectedState === 'ALL' || v.state.toLowerCase() === selectedState.toLowerCase();
+        
+        const matchesStatus =
+          selectedStatus === 'ALL' ||
+          (selectedStatus === 'ACTIVE' && (v.status === 'ACTIVE' || !v.status)) ||
+          (selectedStatus === 'INACTIVE' && v.status === 'INACTIVE') ||
+          (selectedStatus === 'MAINTENANCE' && v.status === 'MAINTENANCE');
+
+        const matchesSport =
+          selectedSport === 'ALL' ||
+          (v.sports_list && v.sports_list.some((s) => s.toLowerCase() === selectedSport.toLowerCase())) ||
+          (v.sports && v.sports.toLowerCase().includes(selectedSport.toLowerCase()));
+
+        return matchesQuery && matchesState && matchesStatus && matchesSport;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'bookings') {
+          return (b.today_bookings_count || 0) - (a.today_bookings_count || 0);
+        }
+        if (sortBy === 'revenue') {
+          return (b.today_booking_revenue || 0) - (a.today_booking_revenue || 0);
+        }
+        if (sortBy === 'courts') {
+          return (b.courts || 0) - (a.courts || 0);
+        }
+        if (sortBy === 'name') {
+          return a.venue_name.localeCompare(b.venue_name);
+        }
+        if (sortBy === 'id') {
+          return a.id.localeCompare(b.id);
+        }
+        return 0;
+      });
+  }, [venues, searchQuery, selectedState, selectedStatus, selectedSport, sortBy]);
+
+  // Global KPIs calculated from all venues
+  const totalLiveVenues = venues.length;
+  const activeVenuesCount = statusCounts.ACTIVE;
+  const inactiveVenuesCount = statusCounts.INACTIVE;
+  const totalCourts = venues.reduce((acc, v) => acc + (v.courts || (v.court_list ? v.court_list.length : 0)), 0);
+  const totalTodayBookings = venues.reduce((acc, v) => acc + (v.status === 'ACTIVE' ? (v.today_bookings_count || 12) : 0), 0);
+  const totalTodayRevenue = venues.reduce((acc, v) => acc + (v.status === 'ACTIVE' ? (v.today_booking_revenue || 15000) : 0), 0);
+
+  // Helper for formatted venue ID
+  const formatVenueId = (id: string) => {
+    if (id.startsWith('ven_')) {
+      return `VEN-${id.replace('ven_', '')}`;
+    }
+    return id.toUpperCase();
+  };
+
+  // Shorten staff role cleanly
+  const formatShortRole = (role?: string) => {
+    if (!role) return 'Manager';
+    if (role.toLowerCase().includes('incharge')) return 'Incharge';
+    if (role.toLowerCase().includes('manager')) return 'Manager';
+    if (role.toLowerCase().includes('supervisor')) return 'Supervisor';
+    if (role.toLowerCase().includes('director')) return 'Director';
+    return role.split(' ')[0];
+  };
+
+  const isAnyFilterActive = searchQuery || selectedState !== 'ALL' || selectedStatus !== 'ALL' || selectedSport !== 'ALL';
 
   return (
-    <div className="animate-in fade-in duration-300">
-      <div className={`space-y-6 ${selectedVenue ? 'hidden' : 'block'}`}>
-      {/* PAGE HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E5E7EB] pb-5">
+    <div className="animate-in fade-in duration-200 space-y-4 max-w-[1600px] mx-auto">
+      {/* 1. MINIMAL HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
         <div>
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#F94001] bg-[#FFF1EC] px-3 py-1 rounded-full mb-2">
-            <Building2 className="h-3.5 w-3.5" /> Turf & Arena Directory
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 font-display">
+              Venue Management
+            </h1>
+            <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[10px] font-bold flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              {activeVenuesCount} Active &bull; {inactiveVenuesCount} Inactive
+            </span>
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-[#021526] font-display">
-            Venue Management
-          </h1>
-          <p className="text-xs text-[#5F6368] mt-1">
-            Registered sports arenas, box turfs, owners KYC, bank credentials, live bookings, and settlements.
+          <p className="text-xs text-slate-500 mt-0.5">
+            Operational turf directory &bull; Filter by state, live active/inactive status, sports, and view real-time booking performance.
           </p>
         </div>
 
         {/* Action button */}
-        <div className="flex items-center gap-3">
-          <Link
-            href="/admin/onboarding"
-            className="inline-flex items-center gap-2 rounded-xl bg-[#F94001] hover:bg-[#D93600] text-white px-4 py-2.5 text-xs font-bold shadow-sm transition-all"
-          >
-            <span>+ Onboard New Partner Turf</span>
-          </Link>
+        <Link
+          href="/admin/onboarding"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#F94001] hover:bg-[#E03800] text-white px-3.5 py-2 text-xs font-bold shadow-xs active:scale-98 transition-all shrink-0 self-start sm:self-auto"
+        >
+          <span>+ Onboard Partner Turf</span>
+        </Link>
+      </div>
+
+      {/* STATUS NOTIFICATION TOAST */}
+      {statusNotification && (
+        <div className="p-3 bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center justify-between shadow-lg animate-in slide-in-from-top-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span>{statusNotification}</span>
+          </div>
+          <button type="button" onClick={() => setStatusNotification(null)} className="text-slate-400 hover:text-white">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 2. SLEEK MINIMAL KPI SUMMARY CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Metric 1: Venues & Status */}
+        <div className="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all">
+          <div className="flex items-center justify-between text-slate-500 text-[11px] font-medium">
+            <span>Registered Venues</span>
+            <Building2 className="h-3.5 w-3.5 text-slate-400" />
+          </div>
+          <div className="mt-1.5 flex items-baseline gap-2">
+            <span className="text-xl font-black text-slate-900 font-mono">{totalLiveVenues}</span>
+            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/60">
+              {activeVenuesCount} Active
+            </span>
+            {inactiveVenuesCount > 0 && (
+              <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/60">
+                {inactiveVenuesCount} Inactive
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Metric 2: Pitches & Courts */}
+        <div className="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all">
+          <div className="flex items-center justify-between text-slate-500 text-[11px] font-medium">
+            <span>Pitches & Courts</span>
+            <Trophy className="h-3.5 w-3.5 text-slate-400" />
+          </div>
+          <div className="mt-1.5 flex items-baseline gap-2">
+            <span className="text-xl font-black text-slate-900 font-mono">{totalCourts}</span>
+            <span className="text-[10px] font-medium text-slate-500">{uniqueSports.length} Sports Covered</span>
+          </div>
+        </div>
+
+        {/* Metric 3: Today's Bookings */}
+        <div className="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all">
+          <div className="flex items-center justify-between text-slate-500 text-[11px] font-medium">
+            <span>Today&apos;s Bookings</span>
+            <CalendarCheck className="h-3.5 w-3.5 text-emerald-600" />
+          </div>
+          <div className="mt-1.5 flex items-baseline gap-2">
+            <span className="text-xl font-black text-emerald-700 font-mono">{totalTodayBookings}</span>
+            <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded">Active Arenas</span>
+          </div>
+        </div>
+
+        {/* Metric 4: Today's Revenue */}
+        <div className="bg-white rounded-xl p-3.5 border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all">
+          <div className="flex items-center justify-between text-slate-500 text-[11px] font-medium">
+            <span>Today&apos;s Gross GMV</span>
+            <DollarSign className="h-3.5 w-3.5 text-[#F94001]" />
+          </div>
+          <div className="mt-1.5 flex items-baseline gap-2">
+            <span className="text-xl font-black text-slate-900 font-mono">₹{totalTodayRevenue.toLocaleString('en-IN')}</span>
+            <span className="text-[10px] font-medium text-slate-500">Live Turnover</span>
+          </div>
         </div>
       </div>
 
-      {/* FILTER & MINIMAL KPI BAR */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white p-3 rounded-2xl border border-[#E5E7EB] shadow-2xs">
-        {/* KPI Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB] whitespace-nowrap">
-            <span className="text-[10px] text-[#5F6368] font-bold uppercase tracking-wide">Live Turfs</span>
-            <span className="text-xs font-black font-mono text-[#021526]">{venues.length}</span>
-          </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8F9FA] border border-[#E5E7EB] whitespace-nowrap">
-            <span className="text-[10px] text-[#5F6368] font-bold uppercase tracking-wide">Total Courts</span>
-            <span className="text-xs font-black font-mono text-[#021526]">{venues.reduce((acc, v) => acc + v.courts, 0)}</span>
-          </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 whitespace-nowrap">
-            <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wide">Monthly GMV</span>
-            <span className="text-xs font-black font-mono text-emerald-800">₹14.1L</span>
-          </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF1EC] border border-[#F94001]/20 whitespace-nowrap">
-            <span className="text-[10px] text-[#F94001] font-bold uppercase tracking-wide">Pending Disbursal</span>
-            <span className="text-xs font-black font-mono text-[#F94001]">₹1.5L</span>
-          </div>
-        </div>
-
-        {/* Search & Filters */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-[#5F6368]" />
+      {/* 3. BEST STATE & STATUS DROPDOWNS & FILTER TOOLBAR */}
+      <div className="bg-white rounded-xl border border-slate-200/90 p-3.5 shadow-2xs space-y-3">
+        {/* Row 1: Search & Quick Status Switcher Segmented Pills */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Live Search Input - fixed icon position with proper padding */}
+          <div className="relative flex-1 min-w-[260px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search venues..."
+              placeholder="Search venue ID, name, city, owner, staff, phone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl bg-slate-50 border border-[#E5E7EB] pl-9 pr-3 py-1.5 text-xs text-[#021526] placeholder-[#5F6368] focus:bg-white focus:border-[#F94001] focus:ring-1 focus:ring-[#F94001] transition-all outline-none"
+              className="w-full h-10 rounded-lg bg-slate-50/70 border border-slate-200 pl-10 pr-9 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#F94001] focus:ring-1 focus:ring-[#F94001] transition-all outline-none"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                title="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-          <div className="relative">
-            <select
-              value={sportFilter}
-              onChange={(e) => setSportFilter(e.target.value)}
-              className="appearance-none pl-8 pr-8 py-1.5 rounded-xl border border-[#E5E7EB] bg-slate-50 text-xs font-semibold focus:outline-none focus:border-[#F94001] focus:ring-1 focus:ring-[#F94001] transition-colors cursor-pointer"
+
+          {/* Quick 1-Click Status Segmented Filter Pills */}
+          <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-lg border border-slate-200/70 self-start md:self-auto shrink-0 overflow-x-auto max-w-full">
+            <button
+              type="button"
+              onClick={() => setSelectedStatus('ALL')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                selectedStatus === 'ALL'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
             >
-              <option value="ALL">All Sports</option>
-              <option value="FOOTBALL">Football</option>
-              <option value="CRICKET">Cricket</option>
-              <option value="BADMINTON">Badminton</option>
-              <option value="PICKLEBALL">Pickleball</option>
-              <option value="TENNIS">Tennis</option>
-            </select>
-            <Trophy className="h-3.5 w-3.5 absolute left-2.5 top-2 text-[#5F6368] pointer-events-none" />
+              All ({venues.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedStatus('ACTIVE')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                selectedStatus === 'ACTIVE'
+                  ? 'bg-white text-emerald-700 shadow-2xs font-bold ring-1 ring-emerald-500/20'
+                  : 'text-slate-500 hover:text-emerald-700'
+              }`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Active ({statusCounts.ACTIVE})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedStatus('INACTIVE')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                selectedStatus === 'INACTIVE'
+                  ? 'bg-white text-rose-700 shadow-2xs font-bold ring-1 ring-rose-500/20'
+                  : 'text-slate-500 hover:text-rose-700'
+              }`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+              Inactive ({statusCounts.INACTIVE})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedStatus('MAINTENANCE')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                selectedStatus === 'MAINTENANCE'
+                  ? 'bg-white text-amber-700 shadow-2xs font-bold ring-1 ring-amber-500/20'
+                  : 'text-slate-500 hover:text-amber-700'
+              }`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              Maintenance ({statusCounts.MAINTENANCE})
+            </button>
           </div>
         </div>
+
+        {/* Row 2: BEST CUSTOM DROPDOWNS: State + Status + Sport + Sort */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+          {/* BEST STATE DROPDOWN */}
+          <div className="relative min-w-[180px]" data-dropdown-container>
+            <button
+              type="button"
+              onClick={() => setOpenDropdown(openDropdown === 'state' ? null : 'state')}
+              className={`w-full h-9.5 px-3 rounded-lg border text-xs font-semibold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
+                selectedState !== 'ALL'
+                  ? 'border-[#F94001] bg-[#FFF8F5] text-[#F94001] ring-1 ring-[#F94001]/20'
+                  : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <MapPin className={`h-3.5 w-3.5 shrink-0 ${selectedState !== 'ALL' ? 'text-[#F94001]' : 'text-slate-400'}`} />
+                <span className="truncate">
+                  {selectedState === 'ALL' ? 'State: All States' : selectedState}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+                  {selectedState === 'ALL' ? venues.length : stateCounts[selectedState] || 0}
+                </span>
+                <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${openDropdown === 'state' ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {/* State Popover */}
+            {openDropdown === 'state' && (
+              <div className="absolute left-0 top-full mt-1.5 w-60 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl z-50 p-1.5 text-xs animate-in fade-in slide-in-from-top-1">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Filter by State</div>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedState('ALL'); setOpenDropdown(null); }}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                    selectedState === 'ALL' ? 'bg-[#FFF1EC] text-[#F94001] font-bold' : 'hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-slate-300" />
+                    All States
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 font-semibold text-slate-600">{venues.length}</span>
+                </button>
+
+                <div className="my-1 border-t border-slate-100" />
+
+                {uniqueStates.map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => { setSelectedState(st); setOpenDropdown(null); }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                      selectedState.toLowerCase() === st.toLowerCase()
+                        ? 'bg-[#FFF1EC] text-[#F94001] font-bold'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <MapPin className="h-3 w-3 text-slate-400" />
+                      <span>{st}</span>
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 font-semibold text-slate-600">
+                      {stateCounts[st]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* BEST STATUS DROPDOWN */}
+          <div className="relative min-w-[180px]" data-dropdown-container>
+            <button
+              type="button"
+              onClick={() => setOpenDropdown(openDropdown === 'status' ? null : 'status')}
+              className={`w-full h-9.5 px-3 rounded-lg border text-xs font-semibold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
+                selectedStatus !== 'ALL'
+                  ? selectedStatus === 'ACTIVE'
+                    ? 'border-emerald-500 bg-emerald-50/70 text-emerald-800 ring-1 ring-emerald-400/30'
+                    : selectedStatus === 'INACTIVE'
+                    ? 'border-rose-300 bg-rose-50/70 text-rose-800 ring-1 ring-rose-300/30'
+                    : 'border-amber-400 bg-amber-50/70 text-amber-800 ring-1 ring-amber-400/30'
+                  : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                {selectedStatus === 'ACTIVE' && <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+                {selectedStatus === 'INACTIVE' && <span className="h-2 w-2 rounded-full bg-rose-500" />}
+                {selectedStatus === 'MAINTENANCE' && <span className="h-2 w-2 rounded-full bg-amber-500" />}
+                {selectedStatus === 'ALL' && <Activity className="h-3.5 w-3.5 text-slate-400" />}
+                <span className="truncate">
+                  {selectedStatus === 'ALL' ? 'Status: All Statuses' : selectedStatus === 'ACTIVE' ? 'Active Venues' : selectedStatus === 'INACTIVE' ? 'Inactive Venues' : 'Maintenance'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+                  {selectedStatus === 'ALL' ? venues.length : statusCounts[selectedStatus as keyof typeof statusCounts] || 0}
+                </span>
+                <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${openDropdown === 'status' ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {/* Status Popover */}
+            {openDropdown === 'status' && (
+              <div className="absolute left-0 top-full mt-1.5 w-56 rounded-xl border border-slate-200 bg-white shadow-xl z-50 p-1.5 text-xs animate-in fade-in slide-in-from-top-1">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Filter by Status</div>
+                
+                {/* All */}
+                <button
+                  type="button"
+                  onClick={() => { setSelectedStatus('ALL'); setOpenDropdown(null); }}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                    selectedStatus === 'ALL' ? 'bg-slate-100 font-bold text-slate-900' : 'hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-slate-400" />
+                    All Statuses
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 font-semibold text-slate-600">{venues.length}</span>
+                </button>
+
+                {/* Active */}
+                <button
+                  type="button"
+                  onClick={() => { setSelectedStatus('ACTIVE'); setOpenDropdown(null); }}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                    selectedStatus === 'ACTIVE' ? 'bg-emerald-50 text-emerald-800 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Active Arenas
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">{statusCounts.ACTIVE}</span>
+                </button>
+
+                {/* Inactive */}
+                <button
+                  type="button"
+                  onClick={() => { setSelectedStatus('INACTIVE'); setOpenDropdown(null); }}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                    selectedStatus === 'INACTIVE' ? 'bg-rose-50 text-rose-800 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-rose-500" />
+                    Inactive Arenas
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 font-bold">{statusCounts.INACTIVE}</span>
+                </button>
+
+                {/* Maintenance */}
+                <button
+                  type="button"
+                  onClick={() => { setSelectedStatus('MAINTENANCE'); setOpenDropdown(null); }}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                    selectedStatus === 'MAINTENANCE' ? 'bg-amber-50 text-amber-800 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-amber-500" />
+                    Under Maintenance
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold">{statusCounts.MAINTENANCE}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* SPORT DROPDOWN */}
+          <div className="relative min-w-[160px]" data-dropdown-container>
+            <button
+              type="button"
+              onClick={() => setOpenDropdown(openDropdown === 'sport' ? null : 'sport')}
+              className={`w-full h-9.5 px-3 rounded-lg border text-xs font-semibold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
+                selectedSport !== 'ALL'
+                  ? 'border-[#F94001] bg-[#FFF8F5] text-[#F94001] ring-1 ring-[#F94001]/20'
+                  : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <Trophy className={`h-3.5 w-3.5 shrink-0 ${selectedSport !== 'ALL' ? 'text-[#F94001]' : 'text-slate-400'}`} />
+                <span className="truncate">
+                  {selectedSport === 'ALL' ? 'Sport: All Sports' : selectedSport}
+                </span>
+              </div>
+              <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform shrink-0 ${openDropdown === 'sport' ? 'rotate-180' : ''}`} />
+            </button>
+
+            {openDropdown === 'sport' && (
+              <div className="absolute left-0 top-full mt-1.5 w-52 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl z-50 p-1.5 text-xs animate-in fade-in slide-in-from-top-1">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Filter by Sport</div>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedSport('ALL'); setOpenDropdown(null); }}
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                    selectedSport === 'ALL' ? 'bg-[#FFF1EC] text-[#F94001] font-bold' : 'hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  <span>All Sports</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 font-semibold text-slate-600">{uniqueSports.length}</span>
+                </button>
+                <div className="my-1 border-t border-slate-100" />
+                {uniqueSports.map((sp) => (
+                  <button
+                    key={sp}
+                    type="button"
+                    onClick={() => { setSelectedSport(sp); setOpenDropdown(null); }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                      selectedSport.toLowerCase() === sp.toLowerCase() ? 'bg-[#FFF1EC] text-[#F94001] font-bold' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span>{sp}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* SORT DROPDOWN */}
+          <div className="relative min-w-[180px]" data-dropdown-container>
+            <button
+              type="button"
+              onClick={() => setOpenDropdown(openDropdown === 'sort' ? null : 'sort')}
+              className="w-full h-9.5 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 hover:border-slate-300 flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs"
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <ArrowUpDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                <span className="truncate">
+                  {sortBy === 'bookings'
+                    ? 'Sort: Bookings'
+                    : sortBy === 'revenue'
+                    ? 'Sort: Revenue'
+                    : sortBy === 'courts'
+                    ? 'Sort: Courts Count'
+                    : sortBy === 'name'
+                    ? 'Sort: Name (A-Z)'
+                    : 'Sort: Venue ID'}
+                </span>
+              </div>
+              <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform shrink-0 ${openDropdown === 'sort' ? 'rotate-180' : ''}`} />
+            </button>
+
+            {openDropdown === 'sort' && (
+              <div className="absolute left-0 top-full mt-1.5 w-52 rounded-xl border border-slate-200 bg-white shadow-xl z-50 p-1.5 text-xs animate-in fade-in slide-in-from-top-1">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Order by</div>
+                {[
+                  { key: 'bookings', label: "Today's Bookings" },
+                  { key: 'revenue', label: "Today's Revenue" },
+                  { key: 'courts', label: 'Courts Count' },
+                  { key: 'name', label: 'Venue Name (A-Z)' },
+                  { key: 'id', label: 'Venue ID' },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => { setSortBy(item.key as any); setOpenDropdown(null); }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                      sortBy === item.key ? 'bg-slate-100 font-bold text-slate-900' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                    {sortBy === item.key && <Check className="h-3 w-3 text-[#F94001]" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* RESET ALL BUTTON */}
+          {isAnyFilterActive && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedState('ALL');
+                setSelectedStatus('ALL');
+                setSelectedSport('ALL');
+              }}
+              className="h-9.5 px-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+              title="Reset all filters"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Reset</span>
+            </button>
+          )}
+
+          <div className="ml-auto text-[11px] font-semibold text-slate-500">
+            Showing <strong className="text-slate-900">{filteredVenues.length}</strong> of {venues.length} venues
+          </div>
+        </div>
+
+        {/* Active Filters Tag Summary */}
+        {isAnyFilterActive && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-slate-100 text-xs text-slate-500">
+            <span className="text-[11px] font-medium text-slate-400">Active Filters:</span>
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-[11px] font-semibold border border-slate-200">
+                &ldquo;{searchQuery}&rdquo;
+                <button type="button" onClick={() => setSearchQuery('')} className="hover:text-rose-600 cursor-pointer">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {selectedState !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#FFF1EC] text-[#F94001] text-[11px] font-semibold border border-[#F94001]/20">
+                State: {selectedState}
+                <button type="button" onClick={() => setSelectedState('ALL')} className="hover:text-rose-600 cursor-pointer">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {selectedStatus !== 'ALL' && (
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border ${
+                selectedStatus === 'ACTIVE'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : selectedStatus === 'INACTIVE'
+                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}>
+                Status: {selectedStatus}
+                <button type="button" onClick={() => setSelectedStatus('ALL')} className="hover:text-rose-600 cursor-pointer">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {selectedSport !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-[11px] font-semibold border border-slate-200">
+                Sport: {selectedSport}
+                <button type="button" onClick={() => setSelectedSport('ALL')} className="hover:text-rose-600 cursor-pointer">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* VENUES DATA TABLE */}
-      <div className="rounded-2xl bg-white border border-[#E5E7EB] shadow-xs overflow-hidden mt-4">
+      {/* 4. PERFECT MINIMAL VENUES DATA TABLE */}
+      <div className="rounded-xl bg-white border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-[#E5E7EB] bg-[#F8F9FA] text-[#5F6368] font-bold uppercase tracking-wider">
-                <th className="py-3 px-4">Venue & City</th>
-                <th className="py-3 px-4">Owner Contact</th>
-                <th className="py-3 px-4">Sports & Courts</th>
-                <th className="py-3 px-4">Bank Status</th>
-                <th className="py-3 px-4 text-center">Actions</th>
+              <tr className="border-b border-slate-200/90 bg-slate-50/75 text-slate-500 font-semibold tracking-wider text-[11px] uppercase select-none">
+                <th className="py-2.5 px-3 w-[95px]">Venue ID</th>
+                <th className="py-2.5 px-3 w-[130px]">Status</th>
+                <th className="py-2.5 px-3 min-w-[200px]">Venue Name & Location</th>
+                <th className="py-2.5 px-3 min-w-[140px]">Owner Contact</th>
+                <th className="py-2.5 px-3 min-w-[140px]">Staff / Manager</th>
+                <th className="py-2.5 px-3 min-w-[130px]">Courts & Sports</th>
+                <th className="py-2.5 px-3 min-w-[150px]">Today&apos;s Performance</th>
+                <th className="py-2.5 px-3 text-center w-[60px]">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E5E7EB]">
-              {filteredVenues.map((v) => (
-                <tr key={v.id} className="hover:bg-[#F8F9FA] transition-colors">
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-[#021526]">{v.venue_name}</p>
-                      {v.id.startsWith('VEN-') && !INITIAL_VENUES.some((iv) => iv.id === v.id) && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-300">
-                          <CheckCircle2 className="h-2.5 w-2.5" /> Live Converted
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-[#5F6368] flex items-center gap-1 mt-0.5">
-                      <MapPin className="h-3 w-3 text-slate-400" />
-                      {v.district}, {v.state}
-                    </p>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <p className="font-semibold text-[#021526]">{v.name}</p>
-                    <p className="text-[11px] text-[#5F6368] font-mono">
-                      +91 {v.mobile_number}
-                    </p>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <div className="flex flex-wrap gap-1 mb-1">
-                      {v.sports_list.map((sp, idx) => (
-                        <span
-                          key={idx}
-                          className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#FFF1EC] text-[#F94001]"
-                        >
-                          {sp}
-                        </span>
-                      ))}
-                    </div>
-                    <span className="text-[11px] text-[#5F6368] font-medium">
-                      {v.courts} Pitches / Courts
-                    </span>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Penny Drop Verified
-                    </span>
-                    <p className="text-[10px] text-[#5F6368] font-mono mt-0.5">
-                      {v.bank.bank_name}
-                    </p>
-                  </td>
-
-                  <td className="py-3.5 px-4 text-center">
+            <tbody className="divide-y divide-slate-100">
+              {filteredVenues.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <p className="font-semibold text-xs text-slate-700">No matching venues found</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Try adjusting your search keyword, state, or status filter</p>
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedVenue(v);
-                        setActiveTab('information');
+                        setSearchQuery('');
+                        setSelectedState('ALL');
+                        setSelectedStatus('ALL');
+                        setSelectedSport('ALL');
                       }}
-                      className="p-2 rounded-xl border border-[#CBD5E1] bg-white text-[#5F6368] hover:bg-[#FFF1EC] hover:text-[#F94001] hover:border-[#F94001] transition-all cursor-pointer shadow-xs inline-flex items-center justify-center group active:scale-95"
-                      title="Inspect Dossier"
+                      className="mt-2.5 px-3 py-1.5 rounded-lg bg-[#F94001] hover:bg-[#E03800] text-white text-xs font-bold transition-all cursor-pointer"
                     >
-                      <Eye className="h-4 w-4 group-hover:scale-110 transition-transform" />
+                      Reset All Filters
                     </button>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredVenues.map((v) => {
+                  const displayId = formatVenueId(v.id);
+                  const isCopied = copiedId === v.id;
+                  const ownerPhone = v.owner?.phone || `+91 ${v.mobile_number}`;
+                  const ownerName = v.owner?.full_name || v.name;
+                  const staffName = v.staff_name || 'Operations Lead';
+                  const staffPhone = v.staff_contact || `+91 ${Number(v.mobile_number) - 1000}`;
+                  const shortRole = formatShortRole(v.staff_role);
+                  const isLiveActive = v.status === 'ACTIVE' || !v.status;
+                  const isInactive = v.status === 'INACTIVE';
+                  const isMaintenance = v.status === 'MAINTENANCE';
+                  const todayCount = isLiveActive ? (v.today_bookings_count || 12) : 0;
+                  const todayRevenue = isLiveActive ? (v.today_booking_revenue || (todayCount * 1300)) : 0;
+                  const occupancy = isLiveActive ? (v.today_slot_occupancy_percent || 85) : 0;
+
+                  // Clean sports list string
+                  const sportsStr = (v.sports_list || v.sports.split(','))
+                    .map((s) => s.trim())
+                    .join(', ');
+
+                  return (
+                    <tr
+                      key={v.id}
+                      className={`hover:bg-slate-50/80 transition-colors group ${
+                        isInactive ? 'bg-slate-50/40 text-slate-600' : ''
+                      }`}
+                    >
+                      {/* 1. VENUE ID */}
+                      <td className="py-2.5 px-3 align-middle whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1">
+                          <span className="font-mono text-[11px] font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/80">
+                            {displayId}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(displayId, v.id)}
+                            className="text-slate-400 hover:text-slate-700 transition-colors p-0.5 cursor-pointer"
+                            title="Copy ID"
+                          >
+                            {isCopied ? <Check className="h-2.5 w-2.5 text-emerald-600" /> : <Copy className="h-2.5 w-2.5" />}
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* 2. INTERACTIVE STATUS BADGE & QUICK SWITCHER */}
+                      <td className="py-2.5 px-3 align-middle whitespace-nowrap" data-status-menu-container>
+                        <div className="relative inline-block text-left">
+                          <button
+                            type="button"
+                            onClick={() => setRowStatusMenuVenueId(rowStatusMenuVenueId === v.id ? null : v.id)}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer shadow-2xs ${
+                              isLiveActive
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100/70'
+                                : isInactive
+                                ? 'bg-rose-50 text-rose-700 border-rose-200/80 hover:bg-rose-100/70'
+                                : 'bg-amber-50 text-amber-700 border-amber-200/80 hover:bg-amber-100/70'
+                            }`}
+                            title="Click to change status"
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                isLiveActive ? 'bg-emerald-500 animate-pulse' : isInactive ? 'bg-rose-500' : 'bg-amber-500'
+                              }`}
+                            />
+                            <span>{isLiveActive ? 'Active' : isInactive ? 'Inactive' : 'Maintenance'}</span>
+                            <ChevronDown className="h-2.5 w-2.5 opacity-60 ml-0.5" />
+                          </button>
+
+                          {/* Quick Row Status Popover */}
+                          {rowStatusMenuVenueId === v.id && (
+                            <div className="absolute left-0 top-full mt-1 w-36 rounded-xl border border-slate-200 bg-white shadow-xl z-40 p-1 text-xs animate-in fade-in slide-in-from-top-1">
+                              <div className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">Set Status</div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleUpdateVenueStatus(v.id, 'ACTIVE');
+                                  setRowStatusMenuVenueId(null);
+                                }}
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[11px] font-semibold transition-colors cursor-pointer ${
+                                  isLiveActive ? 'bg-emerald-50 text-emerald-700 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                                }`}
+                              >
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                <span>Active</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleUpdateVenueStatus(v.id, 'INACTIVE');
+                                  setRowStatusMenuVenueId(null);
+                                }}
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[11px] font-semibold transition-colors cursor-pointer ${
+                                  isInactive ? 'bg-rose-50 text-rose-700 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                                }`}
+                              >
+                                <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                                <span>Inactive</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleUpdateVenueStatus(v.id, 'MAINTENANCE');
+                                  setRowStatusMenuVenueId(null);
+                                }}
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[11px] font-semibold transition-colors cursor-pointer ${
+                                  isMaintenance ? 'bg-amber-50 text-amber-700 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                                }`}
+                              >
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                <span>Maintenance</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 3. VENUE NAME & LOCATION */}
+                      <td className="py-2.5 px-3 align-middle">
+                        <div className="space-y-0.5">
+                          <Link
+                            href={`/admin/venues/${v.id}`}
+                            className="font-bold text-slate-900 text-xs tracking-tight group-hover:text-[#F94001] transition-colors line-clamp-1 block cursor-pointer"
+                          >
+                            {v.venue_name}
+                          </Link>
+
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                            <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
+                            <span className="truncate max-w-[140px]">{v.district}</span>
+                            <span className="text-slate-300">&bull;</span>
+                            <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/60">
+                              {v.state}
+                            </span>
+                            {v.venue_location_name && (
+                              <a
+                                href={v.venue_location_name}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-slate-400 hover:text-[#F94001] transition-colors"
+                                title="Open GPS Map"
+                              >
+                                <ExternalLink className="h-2.5 w-2.5" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 4. OWNER CONTACT */}
+                      <td className="py-2.5 px-3 align-middle">
+                        <div className="space-y-0.5">
+                          <p className="font-medium text-slate-900 text-xs truncate max-w-[140px] flex items-center gap-1">
+                            <User className="h-3 w-3 text-slate-400 shrink-0" />
+                            {ownerName}
+                          </p>
+                          <p className="font-mono text-[11px] text-slate-500">
+                            <a
+                              href={`tel:${ownerPhone.replace(/\s+/g, '')}`}
+                              className="hover:text-[#F94001] transition-colors flex items-center gap-1"
+                            >
+                              <Phone className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
+                              {ownerPhone}
+                            </a>
+                          </p>
+                        </div>
+                      </td>
+
+                      {/* 5. STAFF / MANAGER */}
+                      <td className="py-2.5 px-3 align-middle">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium text-slate-900 text-xs truncate max-w-[100px]">
+                              {staffName}
+                            </span>
+                            <span className="text-[9px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/60 shrink-0">
+                              {shortRole}
+                            </span>
+                          </div>
+                          <p className="font-mono text-[11px] text-slate-500">
+                            <a
+                              href={`tel:${staffPhone.replace(/\s+/g, '')}`}
+                              className="hover:text-[#F94001] transition-colors flex items-center gap-1"
+                            >
+                              <Phone className="h-2.5 w-2.5 text-blue-600 shrink-0" />
+                              {staffPhone}
+                            </a>
+                          </p>
+                        </div>
+                      </td>
+
+                      {/* 6. COURTS & SPORTS */}
+                      <td className="py-2.5 px-3 align-middle">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5 font-bold text-slate-900 text-xs">
+                            <Trophy className="h-3 w-3 text-slate-400 shrink-0" />
+                            <span>{v.courts} {v.courts === 1 ? 'Court' : 'Courts'}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate max-w-[140px]" title={sportsStr}>
+                            {sportsStr}
+                          </p>
+                        </div>
+                      </td>
+
+                      {/* 7. TODAY'S BOOKINGS & PRICE */}
+                      <td className="py-2.5 px-3 align-middle">
+                        {isLiveActive ? (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-xs text-slate-900">
+                                ₹{todayRevenue.toLocaleString('en-IN')}
+                              </span>
+                              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.2 rounded">
+                                {todayCount} bks
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                              <div className="w-14 h-1.5 rounded-full bg-slate-100 overflow-hidden shrink-0">
+                                <div
+                                  className="h-full bg-emerald-500 rounded-full"
+                                  style={{ width: `${Math.min(occupancy, 100)}%` }}
+                                />
+                              </div>
+                              <span className="font-mono font-medium">{occupancy}%</span>
+                            </div>
+                          </div>
+                        ) : isInactive ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200/60 text-[10px] font-semibold">
+                            <span className="h-1 w-1 rounded-full bg-rose-500" />
+                            Offline &bull; Inactive
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60 text-[10px] font-semibold">
+                            <span className="h-1 w-1 rounded-full bg-amber-500" />
+                            Under Renovation
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 8. ACTION (EYE ICON) */}
+                      {/* 8. ACTION (EYE ICON -> DEDICATED MODULAR OVERVIEW SCREEN) */}
+                      <td className="py-2.5 px-3 align-middle text-center">
+                        <Link
+                          href={`/admin/venues/${v.id}`}
+                          className="h-7 w-7 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-[#F94001] hover:border-[#F94001]/40 hover:bg-[#FFF1EC] transition-all inline-flex items-center justify-center cursor-pointer shadow-2xs"
+                          title="Open Dedicated Modular Overview Screen"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       </div>
-
-      </div>
-
-      {/* VENUE DOSSIER TOP-HEADER VIEW */}
-      {selectedVenue && (
-        <div className="space-y-6 mt-2">
-          {/* Header Card */}
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-xs overflow-hidden">
-            <div className="p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div className="flex items-center gap-4">
-                <div className="h-16 w-16 rounded-full bg-[#6366F1] text-white flex items-center justify-center text-2xl font-black shadow-inner">
-                  {selectedVenue.venue_name.substring(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <h2 className="text-xl font-black text-[#021526] font-display flex items-center gap-2">
-                    {selectedVenue.venue_name}
-                  </h2>
-                  <p className="text-xs text-slate-500 font-mono mt-1 font-semibold">
-                    {selectedVenue.id} • {selectedVenue.district}, {selectedVenue.state}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold flex items-center gap-1.5">
-                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active
-                </span>
-                <button className="px-4 py-2 rounded-xl bg-[#021526] hover:bg-[#F94001] text-white text-xs font-bold shadow-sm transition-colors flex items-center gap-2 cursor-pointer">
-                  <User className="h-3.5 w-3.5" /> Edit Venue
-                </button>
-                <button className="px-4 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold bg-white transition-colors flex items-center gap-2 cursor-pointer">
-                  <AlertCircle className="h-3.5 w-3.5" /> Suspend
-                </button>
-                <button onClick={() => setSelectedVenue(null)} className="px-4 py-2 rounded-xl border border-[#CBD5E1] text-[#5F6368] hover:bg-slate-50 text-xs font-bold bg-white transition-colors flex items-center gap-2 cursor-pointer">
-                  &larr; Back
-                </button>
-              </div>
-            </div>
-
-            {/* Horizontal Tabs */}
-            <div className="px-6 md:px-8 border-t border-[#E5E7EB] flex items-center gap-8 overflow-x-auto scrollbar-none">
-              {[
-                { key: 'information', label: 'Venue Information' },
-                { key: 'bookings', label: 'Bookings' },
-                { key: 'payments', label: 'Booking Payments' },
-                { key: 'settlements', label: 'Settlements' },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveTab(tab.key as VenueInspectionTab)}
-                  className={`py-4 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
-                    activeTab === tab.key
-                      ? 'border-[#021526] text-[#021526]'
-                      : 'border-transparent text-[#5F6368] hover:text-[#021526]'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* MAIN CONTENT AREA */}
-          <div className="w-full">
-              {/* COMBINED ONBOARDING INFORMATION TAB */}
-              {activeTab === 'information' && (
-                <div className="space-y-6">
-                  {/* VENUE PROFILE & TIMINGS */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-3">
-                      <h4 className="font-bold text-sm text-[#021526] flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-[#F94001]" /> Venue Profile
-                      </h4>
-                      <div className="space-y-2">
-                        <div>
-                          <span className="text-[10px] text-slate-500 uppercase font-semibold">Tagline</span>
-                          <p className="font-semibold">{selectedVenue.tagline}</p>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-500 uppercase font-semibold">Street Address</span>
-                          <p className="font-semibold">{selectedVenue.address}</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <span className="text-[10px] text-slate-500 uppercase font-semibold">District</span>
-                            <p className="font-semibold">{selectedVenue.district}</p>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-slate-500 uppercase font-semibold">Postal Pincode</span>
-                            <p className="font-semibold">{selectedVenue.pincode}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-3">
-                      <h4 className="font-bold text-sm text-[#021526] flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-[#F94001]" /> Operating Timings & Maps
-                      </h4>
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <span className="text-[10px] text-slate-500 uppercase font-semibold">Opening Time</span>
-                            <p className="font-bold text-emerald-600">{selectedVenue.opening_time}</p>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-slate-500 uppercase font-semibold">Closing Time</span>
-                            <p className="font-bold text-slate-700">{selectedVenue.closing_time}</p>
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-500 uppercase font-semibold">Google Maps GPS Link</span>
-                          <a
-                            href={selectedVenue.venue_location_name}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[#F94001] hover:underline flex items-center gap-1 font-mono mt-0.5 truncate block"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                            {selectedVenue.venue_location_name}
-                          </a>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-500 uppercase font-semibold">Approved Sports</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {selectedVenue.sports_list.map((sp, i) => (
-                              <span key={i} className="px-2 py-0.5 rounded bg-white border border-slate-200 font-semibold">
-                                {sp}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* OWNER & KYC */}
-                  <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-4">
-                    <h4 className="font-bold text-sm text-[#021526] flex items-center gap-2">
-                      <User className="h-4 w-4 text-[#F94001]" /> Verified Owner / Managing Partner
-                    </h4>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                      <div>
-                        <span className="text-[10px] text-slate-500 uppercase font-semibold">Full Legal Name</span>
-                        <p className="font-bold text-sm">{selectedVenue.owner.full_name}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 uppercase font-semibold">Contact Phone</span>
-                        <p className="font-mono font-bold">{selectedVenue.owner.phone}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 uppercase font-semibold">Email Address</span>
-                        <p className="font-mono">{selectedVenue.owner.email}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 uppercase font-semibold">PAN Card</span>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="font-mono font-bold">{selectedVenue.owner.pan_number}</span>
-                          <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                            VERIFIED
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 uppercase font-semibold">Aadhaar (Masked)</span>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="font-mono font-bold">{selectedVenue.owner.aadhaar_masked}</span>
-                          <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                            VERIFIED
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 uppercase font-semibold">GSTIN Registration</span>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="font-mono font-bold">{selectedVenue.owner.gstin}</span>
-                          <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                            ACTIVE
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-200">
-                      <span className="text-[10px] text-slate-500 uppercase font-semibold">Registered Entity Address</span>
-                      <p className="font-semibold text-slate-700 mt-0.5">{selectedVenue.owner.registered_address}</p>
-                    </div>
-                  </div>
-
-                  {/* BANK DETAILS */}
-                  <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-[#021526] text-white space-y-4 shadow-md">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Landmark className="h-5 w-5 text-[#F94001]" />
-                        <span className="font-bold text-sm tracking-wide">Payout Disbursement Account</span>
-                      </div>
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" /> Penny Drop Verified
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-2">
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase font-mono">Account Beneficiary</span>
-                        <p className="font-bold text-sm text-slate-100">{selectedVenue.bank.account_holder_name}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase font-mono">Bank Name</span>
-                        <p className="font-bold text-slate-100">{selectedVenue.bank.bank_name}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase font-mono">Masked Account Number</span>
-                        <p className="font-mono font-bold text-slate-100">{selectedVenue.bank.account_number_masked}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase font-mono">IFSC Code</span>
-                        <p className="font-mono font-bold text-slate-100">{selectedVenue.bank.ifsc_code}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase font-mono">Branch Location</span>
-                        <p className="font-bold text-slate-100">{selectedVenue.bank.branch_name}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase font-mono">Instant UPI VPA</span>
-                        <p className="font-mono font-bold text-[#F94001]">{selectedVenue.bank.upi_id}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* COURTS & PITCHES */}
-                  <div>
-                    <h4 className="font-bold text-sm text-[#021526] flex items-center gap-2 mb-3 px-1">
-                      <Trophy className="h-4 w-4 text-[#F94001]" /> Configured Courts & Pitches
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {selectedVenue.court_list.map((court) => (
-                        <div
-                          key={court.id}
-                          className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] space-y-2 hover:border-[#F94001] transition-colors"
-                        >
-                          <div className="flex items-center justify-between">
-                            <h5 className="font-bold text-sm text-[#021526]">{court.name}</h5>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FFF1EC] text-[#F94001]">
-                              {court.sport}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-[#5F6368]">{court.surface}</p>
-                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 text-[11px]">
-                            <div>
-                              <span className="text-[10px] text-slate-400 uppercase font-semibold">Dimensions</span>
-                              <p className="font-semibold">{court.dimensions}</p>
-                            </div>
-                            <div>
-                              <span className="text-[10px] text-slate-400 uppercase font-semibold">Lighting</span>
-                              <p className="font-semibold">{court.lighting}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between pt-1">
-                            <span className="text-[11px] font-bold text-slate-700">
-                              Base Rate: <span className="text-[#F94001] font-mono">₹{court.base_hourly_rate} / hr</span>
-                            </span>
-                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                              {court.court_type}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* SLOTS & PRICING */}
-                  <div>
-                    <h4 className="font-bold text-sm text-[#021526] flex items-center gap-2 mb-3 px-1">
-                      <Clock className="h-4 w-4 text-[#F94001]" /> Slot Pricing Rules
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-1">
-                        <span className="text-[10px] font-bold text-amber-800 uppercase">Peak Morning Slot</span>
-                        <p className="font-bold text-sm text-amber-950">{selectedVenue.slot_rules.peak_morning_hours}</p>
-                        <p className="text-lg font-black text-amber-900 font-mono">₹{selectedVenue.slot_rules.peak_morning_price} / hr</p>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 space-y-1">
-                        <span className="text-[10px] font-bold text-blue-800 uppercase">Regular Day Slot</span>
-                        <p className="font-bold text-sm text-blue-950">{selectedVenue.slot_rules.regular_day_hours}</p>
-                        <p className="text-lg font-black text-blue-900 font-mono">₹{selectedVenue.slot_rules.regular_day_price} / hr</p>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 space-y-1">
-                        <span className="text-[10px] font-bold text-purple-800 uppercase">Prime Night Slot</span>
-                        <p className="font-bold text-sm text-purple-950">{selectedVenue.slot_rules.prime_night_hours}</p>
-                        <p className="text-lg font-black text-purple-900 font-mono">₹{selectedVenue.slot_rules.prime_night_price} / hr</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 p-4 rounded-2xl bg-[#F8F9FA] border border-[#E5E7EB] flex items-center justify-between">
-                      <div>
-                        <h5 className="font-bold text-xs text-[#021526]">Weekend Surge Pricing</h5>
-                        <p className="text-[11px] text-[#5F6368]">Automatic rate adjustment applied on Saturdays and Sundays.</p>
-                      </div>
-                      <span className="text-sm font-black font-mono text-[#F94001]">
-                        +{selectedVenue.slot_rules.weekend_surge_percent}% Surge
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 6: BOOKINGS */}
-              {activeTab === 'bookings' && (
-                <div className="space-y-4">
-                  {venueBookings.length === 0 ? (
-                    <div className="text-center py-8 text-slate-500">No recent bookings recorded for this venue.</div>
-                  ) : (
-                    <div className="overflow-x-auto rounded-2xl border border-[#E5E7EB]">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-[#F8F9FA] text-[#5F6368] font-bold uppercase">
-                          <tr>
-                            <th className="py-2.5 px-3">Booking Code</th>
-                            <th className="py-2.5 px-3">Customer</th>
-                            <th className="py-2.5 px-3">Court & Slot</th>
-                            <th className="py-2.5 px-3">Amount</th>
-                            <th className="py-2.5 px-3">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E5E7EB]">
-                          {venueBookings.map((b) => (
-                            <tr key={b.id} className="hover:bg-[#F8F9FA]">
-                              <td className="py-2.5 px-3 font-mono font-bold text-[#F94001]">{b.booking_code}</td>
-                              <td className="py-2.5 px-3">
-                                <p className="font-bold">{b.customer_name}</p>
-                                <p className="text-[10px] text-slate-500 font-mono">{b.customer_phone}</p>
-                              </td>
-                              <td className="py-2.5 px-3">
-                                <p className="font-semibold">{b.court_name}</p>
-                                <p className="text-[10px] text-slate-500">{b.booking_date} • {b.time_slot}</p>
-                              </td>
-                              <td className="py-2.5 px-3 font-mono font-bold">₹{b.total_amount}</td>
-                              <td className="py-2.5 px-3">
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                  {b.booking_status}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TAB 7: BOOKING PAYMENTS */}
-              {activeTab === 'payments' && (
-                <div className="space-y-4">
-                  <div className="overflow-x-auto rounded-2xl border border-[#E5E7EB]">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-[#F8F9FA] text-[#5F6368] font-bold uppercase">
-                        <tr>
-                          <th className="py-2.5 px-3">Txn ID / Ref</th>
-                          <th className="py-2.5 px-3">Customer</th>
-                          <th className="py-2.5 px-3">Gross Paid</th>
-                          <th className="py-2.5 px-3">Platform Fee (10%)</th>
-                          <th className="py-2.5 px-3">Net Venue Payout</th>
-                          <th className="py-2.5 px-3">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#E5E7EB]">
-                        {venuePayments.map((p) => (
-                          <tr key={p.id} className="hover:bg-[#F8F9FA]">
-                            <td className="py-2.5 px-3 font-mono">
-                              <p className="font-bold text-[#021526]">{p.txn_id}</p>
-                              <p className="text-[10px] text-slate-500">{p.gateway_payment_id}</p>
-                            </td>
-                            <td className="py-2.5 px-3 font-medium">{p.customer_name}</td>
-                            <td className="py-2.5 px-3 font-mono font-bold">₹{p.gross_amount}</td>
-                            <td className="py-2.5 px-3 font-mono text-slate-500">₹{p.platform_commission}</td>
-                            <td className="py-2.5 px-3 font-mono font-bold text-emerald-600">₹{p.net_venue_payout}</td>
-                            <td className="py-2.5 px-3">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                {p.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 8: SETTLEMENTS */}
-              {activeTab === 'settlements' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-[#FFF1EC] border border-[#F94001]/20">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-[#F94001]">Current Unsettled Balance</span>
-                      <p className="text-xl font-black text-[#021526] font-mono">
-                        ₹{selectedVenue.financials.unsettled_balance.toLocaleString()}
-                      </p>
-                    </div>
-                    <span className="px-3 py-1 rounded-xl bg-[#F94001] text-white text-xs font-bold shadow-xs">
-                      Next Auto-Disbursal in 2 Days
-                    </span>
-                  </div>
-
-                  <div className="overflow-x-auto rounded-2xl border border-[#E5E7EB]">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-[#F8F9FA] text-[#5F6368] font-bold uppercase">
-                        <tr>
-                          <th className="py-2.5 px-3">Batch Number</th>
-                          <th className="py-2.5 px-3">Cycle Period</th>
-                          <th className="py-2.5 px-3">Bookings</th>
-                          <th className="py-2.5 px-3">Net Disbursed</th>
-                          <th className="py-2.5 px-3">UTR Reference</th>
-                          <th className="py-2.5 px-3">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#E5E7EB]">
-                        {venueSettlements.map((s) => (
-                          <tr key={s.id} className="hover:bg-[#F8F9FA]">
-                            <td className="py-2.5 px-3 font-mono font-bold text-[#021526]">{s.batch_number}</td>
-                            <td className="py-2.5 px-3 text-[11px] text-slate-600">
-                              {s.period_start} to {s.period_end}
-                            </td>
-                            <td className="py-2.5 px-3 font-mono">{s.bookings_count} slots</td>
-                            <td className="py-2.5 px-3 font-mono font-bold text-emerald-600">
-                              ₹{s.net_payable.toLocaleString()}
-                            </td>
-                            <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">
-                              {s.utr_number || 'Pending Generation'}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  s.status === 'SETTLED'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-amber-100 text-amber-800'
-                                }`}
-                              >
-                                {s.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    );
+    </div>
+  );
 }

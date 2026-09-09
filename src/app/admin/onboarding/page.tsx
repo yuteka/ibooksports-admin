@@ -470,6 +470,13 @@ export default function PartnerOnboardingAdminTrackerPage() {
               unsettled_balance: 0,
               total_settled: 0,
             },
+            amenities: [
+              'Parking Available',
+              'Changing Rooms',
+              'Drinking Water',
+              'CCTV Surveillance',
+              'Floodlights',
+            ],
           };
 
           // Deduplicate and prepend
