@@ -5,6 +5,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, Sparkles, LayoutDashboard } from 'lucide-react';
 
+/**
+ * Global Navigation Bar
+ * Handles brand logo routing, partner portal login, admin switch, and onboarding CTA.
+ */
 export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[#E5E7EB] bg-white/90 backdrop-blur-md shadow-xs">
