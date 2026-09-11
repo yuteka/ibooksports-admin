@@ -58,7 +58,6 @@ const SPORT_ICONS: Record<string, string> = {
 export default function CourtRequestsPage() {
   const [requests, setRequests] = useState<CourtExtensionRequest[]>(INITIAL_COURT_REQUESTS);
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
-  const [selectedState, setSelectedState] = useState<string>('ALL');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('ALL');
   const [selectedSport, setSelectedSport] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -139,31 +138,14 @@ export default function CourtRequestsPage() {
     return 'REJECTED';
   };
 
-  // Unique available States with count
-  const stateCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    requests.forEach((req) => {
-      const st = getRequestState(req);
-      counts[st] = (counts[st] || 0) + 1;
-    });
-    return counts;
-  }, [requests]);
-
-  const uniqueStates = useMemo(() => {
-    return Object.keys(stateCounts).sort();
-  }, [stateCounts]);
-
   // Unique available Districts
   const availableDistricts = useMemo(() => {
     const districts = new Set<string>();
     requests.forEach((req) => {
-      const st = getRequestState(req);
-      if (selectedState === 'ALL' || selectedState.toLowerCase() === st.toLowerCase()) {
-        districts.add(getRequestDistrict(req));
-      }
+      districts.add(getRequestDistrict(req));
     });
     return Array.from(districts).sort();
-  }, [requests, selectedState]);
+  }, [requests]);
 
   // Unique available Sports
   const availableSports = useMemo(() => {
@@ -175,20 +157,18 @@ export default function CourtRequestsPage() {
     return Array.from(sports);
   }, [requests]);
 
-  // Base list filtered by state, district, sport, search for KPIs
+  // Base list filtered by district, sport, search for KPIs
   const baseFilteredRequests = useMemo(() => {
     return requests.filter((req) => {
-      const reqState = getRequestState(req);
       const reqDistrict = getRequestDistrict(req);
 
-      const matchesState =
-        selectedState === 'ALL' || reqState.toLowerCase() === selectedState.toLowerCase();
       const matchesDistrict =
         selectedDistrict === 'ALL' || reqDistrict.toLowerCase() === selectedDistrict.toLowerCase();
       const matchesSport =
         selectedSport === 'ALL' || req.sport.toLowerCase() === selectedSport.toLowerCase();
 
       const q = searchQuery.toLowerCase().trim();
+      const reqState = getRequestState(req);
       const matchesQuery =
         !q ||
         req.id.toLowerCase().includes(q) ||
@@ -202,9 +182,9 @@ export default function CourtRequestsPage() {
         reqState.toLowerCase().includes(q) ||
         reqDistrict.toLowerCase().includes(q);
 
-      return matchesState && matchesDistrict && matchesSport && matchesQuery;
+      return matchesDistrict && matchesSport && matchesQuery;
     });
-  }, [requests, selectedState, selectedDistrict, selectedSport, searchQuery]);
+  }, [requests, selectedDistrict, selectedSport, searchQuery]);
 
   // KPI Calculations
   const totalCount = baseFilteredRequests.length;
@@ -397,7 +377,7 @@ export default function CourtRequestsPage() {
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-black text-[#021526] font-mono">{totalCount}</span>
             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-              {uniqueStates.length} States
+              Active
             </span>
           </div>
           <p className="text-[10px] text-slate-400 mt-1 font-medium">Inbound facility court additions</p>
@@ -480,68 +460,7 @@ export default function CourtRequestsPage() {
         </div>
       </div>
 
-      {/* 3. MULTI-STATE FINDER TABS */}
-      <div className="bg-white rounded-2xl border border-[#E5E7EB] p-3 shadow-xs space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-[#F94001]" />
-            <span className="text-xs font-black uppercase tracking-wider text-[#021526]">
-              Filter by State:
-            </span>
-          </div>
-          <span className="text-[11px] font-semibold text-slate-500">
-            {selectedState === 'ALL'
-              ? `All ${uniqueStates.length} states`
-              : `Active State: ${selectedState}`}
-          </span>
-        </div>
-
-        {/* State Pills Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-          <button
-            type="button"
-            onClick={() => setSelectedState('ALL')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-              selectedState === 'ALL'
-                ? 'bg-[#021526] text-white shadow-sm'
-                : 'bg-[#F8F9FA] text-[#5F6368] hover:bg-slate-200 border border-[#E5E7EB]'
-            }`}
-          >
-            <span>All States</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                selectedState === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}
-            >
-              {requests.length}
-            </span>
-          </button>
-
-          {uniqueStates.map((st) => (
-            <button
-              key={st}
-              type="button"
-              onClick={() => setSelectedState(st)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                selectedState === st
-                  ? 'bg-[#F94001] text-white shadow-sm shadow-[#F94001]/30'
-                  : 'bg-[#F8F9FA] text-[#5F6368] hover:bg-slate-200 border border-[#E5E7EB]'
-              }`}
-            >
-              <span>{st}</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                  selectedState === st ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                }`}
-              >
-                {stateCounts[st]}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 4. SEARCH, STATUS PILLS & DROPDOWN FILTERS */}
+      {/* 3. SEARCH, STATUS PILLS & DROPDOWN FILTERS */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-[#E5E7EB] shadow-xs">
         {/* Left: Status Filter Pills */}
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -635,7 +554,6 @@ export default function CourtRequestsPage() {
 
           {/* Reset Filters */}
           {(searchQuery ||
-            selectedState !== 'ALL' ||
             selectedDistrict !== 'ALL' ||
             selectedSport !== 'ALL' ||
             selectedStatus !== 'ALL') && (
@@ -643,7 +561,6 @@ export default function CourtRequestsPage() {
               type="button"
               onClick={() => {
                 setSearchQuery('');
-                setSelectedState('ALL');
                 setSelectedDistrict('ALL');
                 setSelectedSport('ALL');
                 setSelectedStatus('ALL');
